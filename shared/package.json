@@ -8,7 +8,7 @@
   "exports": { ".": "./src/index.ts" },
   "scripts": { "type-check": "tsc --noEmit" },
   "dependencies": {
-    "fe-kit": "github:bangdinh/fe-kit#v0.1.0"
+    "fe-kit": "github:bangdinh/fe-kit#main"
   },
   "devDependencies": {
     "typescript": "^7.0.2"

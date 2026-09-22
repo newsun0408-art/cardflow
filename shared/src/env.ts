@@ -19,6 +19,8 @@ export const env = defineEnvironments(
       gateway: 'https://beta-gateway.example.com',
       ssoIssuer: 'https://beta-sso.example.com',
       webOrigin: 'https://beta.example.com',
+
+      
     },
     prod: {
       gateway: 'https://gateway.example.com',

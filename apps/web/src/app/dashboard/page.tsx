@@ -13,6 +13,8 @@ import {
   SettingOutlined,
   HistoryOutlined,
   AppstoreOutlined,
+  TableOutlined,
+  UnorderedListOutlined,
   MenuUnfoldOutlined,
   MenuFoldOutlined,
   LockOutlined,
@@ -25,13 +27,12 @@ import {
   DollarOutlined,
   StarOutlined,
   CloseOutlined,
-  InboxOutlined,
   CloseCircleFilled,
   EyeOutlined,
   EyeInvisibleOutlined
 } from '@ant-design/icons';
 
-import { PersonalCard3D } from '../_components/PersonalCard3D';
+import { PersonalCard3D, type CardTheme } from '../_components/PersonalCard3D';
 import { CardQuickControls } from '../_components/CardQuickControls';
 import { CardBalanceCard } from '../_components/CardBalanceCard';
 import { ChangePinModal } from '../_components/ChangePinModal';
@@ -39,6 +40,10 @@ import { SetLimitModal } from '../_components/SetLimitModal';
 import { AddCardModal, type CardDataModel } from '../_components/AddCardModal';
 import { VerifyPinModal } from '../_components/VerifyPinModal';
 import { ExportReportModal } from '../_components/ExportReportModal';
+import { AppSettingsHub } from '../_components/AppSettingsHub';
+import { TransactionExpenseManager } from '../_components/TransactionExpenseManager';
+import type { UserProfile } from '@cardflow-app/shared';
+import { DEFAULT_USER_PROFILE } from '@cardflow-app/shared';
 
 // INITIAL MOCK CARDS DATA
 const INITIAL_CARDS: CardDataModel[] = [
@@ -116,7 +121,7 @@ interface TransactionItem {
   cardId: string;
   cardLast4: string;
   merchant: string;
-  category: 'dining' | 'shopping' | 'transport' | 'tech' | 'salary' | 'refund';
+  category: 'dining' | 'shopping' | 'transport' | 'tech' | 'salary' | 'refund' | 'housing' | 'investment' | 'education' | 'other';
   categoryLabel: string;
   amount: number;
   type: 'expense' | 'income';
@@ -142,8 +147,108 @@ export default function FullscreenDashboard() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'cards' | 'transactions' | 'stats' | 'settings'>('overview');
 
+  // User Profile State
+  const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_USER_PROFILE);
+
+  // Cards View Mode State ('grid' | 'table' | 'list')
+  const [cardsViewMode, setCardsViewMode] = useState<'grid' | 'table' | 'list'>('grid');
+
+  // Sync user profile and cards view mode from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('cardflow_user_profile');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.fullName) {
+            setUserProfile(parsed);
+          }
+        }
+
+        const savedView = localStorage.getItem('cardflow_cards_view_mode') as 'grid' | 'table' | 'list' | null;
+        if (savedView && ['grid', 'table', 'list'].includes(savedView)) {
+          setCardsViewMode(savedView);
+        }
+      } catch {
+        // Ignore localStorage parsing issues
+      }
+    }
+  }, []);
+
+  const getCardMiniGradient = (theme: CardTheme) => {
+    switch (theme) {
+      case 'gold-elegance':
+      case 'gold-luxe':
+        return 'linear-gradient(135deg, #d4af37, #78350f)';
+      case 'crimson-ruby':
+        return 'linear-gradient(135deg, #ef4444, #7f1d1d)';
+      case 'deep-sapphire':
+        return 'linear-gradient(135deg, #0284c7, #1e3a8a)';
+      case 'holographic':
+        return 'linear-gradient(135deg, #ec4899, #8b5cf6)';
+      case 'dark-cyber':
+      default:
+        return 'linear-gradient(135deg, #06b6d4, #0f172a)';
+    }
+  };
+
+  const handleCardsViewModeChange = (mode: 'grid' | 'table' | 'list') => {
+    setCardsViewMode(mode);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('cardflow_cards_view_mode', mode);
+      } catch {
+        // Ignore storage errors
+      }
+    }
+  };
+
+  const getUserInitials = (name: string) => {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      const first = parts[parts.length - 2]?.[0] ?? '';
+      const second = parts[parts.length - 1]?.[0] ?? '';
+      return (first + second).toUpperCase() || 'CF';
+    }
+    return (parts[0]?.[0] ?? 'CF').toUpperCase();
+  };
+
+
+  const handleAddTransaction = (newTxData: Omit<TransactionItem, 'id' | 'referenceId' | 'status'>) => {
+    const newTx: TransactionItem = {
+      ...newTxData,
+      id: `tx-${Date.now()}`,
+      referenceId: `TXN-${newTxData.cardLast4}-${Math.floor(10000 + Math.random() * 90000)}`,
+      status: 'Thành công',
+    };
+    setTransactions((prev) => [newTx, ...prev]);
+
+    if (newTx.type === 'expense') {
+      setCards((prev) =>
+        prev.map((c) =>
+          c.id === newTx.cardId
+            ? { ...c, spentToday: c.spentToday + Math.abs(newTx.amount) }
+            : c
+        )
+      );
+    }
+  };
+
+  const handleProfileSave = (updated: UserProfile) => {
+    setUserProfile(updated);
+    setCards((prev) =>
+      prev.map((c) => ({
+        ...c,
+        holderName: updated.fullName.toUpperCase(),
+      }))
+    );
+    showToast(`✨ Đã cập nhật hồ sơ: ${updated.fullName}`);
+  };
+
   // Cards State & Selection
+
   const [cards, setCards] = useState<CardDataModel[]>(INITIAL_CARDS);
+  const [transactions, setTransactions] = useState<TransactionItem[]>(INITIAL_TRANSACTIONS);
   const [activeCardId, setActiveCardId] = useState<string>('card-1');
   const [showSensitiveData, setShowSensitiveData] = useState(false);
   const [decryptedSensitiveData, setDecryptedSensitiveData] = useState<
@@ -169,6 +274,9 @@ export default function FullscreenDashboard() {
   const [txCardFilter, setTxCardFilter] = useState<string>('all');
   const [txTypeFilter, setTxTypeFilter] = useState<'all' | 'expense' | 'income'>('all');
   const [txTimeFilter, setTxTimeFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  void setTxCardFilter;
+  void setTxTypeFilter;
+  void setTxTimeFilter;
 
   // Modals & Triggers
   const [isAddCardOpen, setIsAddCardOpen] = useState(false);
@@ -321,7 +429,7 @@ export default function FullscreenDashboard() {
   };
 
   // Filtered Transactions
-  const filteredTransactions = INITIAL_TRANSACTIONS.filter((tx) => {
+  const filteredTransactions = transactions.filter((tx) => {
     if (txCardFilter !== 'all' && tx.cardId !== txCardFilter) return false;
     if (txTypeFilter !== 'all' && tx.type !== txTypeFilter) return false;
     if (txSearchQuery) {
@@ -667,7 +775,18 @@ export default function FullscreenDashboard() {
               <span>{isBalanceHidden ? 'Số dư: Ẩn' : 'Số dư: Hiện'}</span>
             </button>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingLeft: '12px', borderLeft: '1px solid rgba(255,255,255,0.1)' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                paddingLeft: '12px',
+                borderLeft: '1px solid rgba(255,255,255,0.1)',
+                cursor: 'pointer',
+              }}
+              onClick={() => setActiveTab('settings')}
+              title="Nhấp để chuyển tới Cài đặt & chỉnh sửa hồ sơ"
+            >
               <div
                 style={{
                   width: '36px',
@@ -680,17 +799,34 @@ export default function FullscreenDashboard() {
                   fontWeight: 800,
                   fontSize: '14px',
                   color: '#ffffff',
+                  overflow: 'hidden',
+                  flexShrink: 0,
+                  border: '2px solid rgba(56, 189, 248, 0.4)',
                 }}
               >
-                L
+                {userProfile.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={userProfile.avatarUrl}
+                    alt={userProfile.fullName}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  getUserInitials(userProfile.fullName)
+                )}
               </div>
               <div className="topbar-username">
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#ffffff' }}>Lê Huỳnh Thuận</div>
-                <div style={{ fontSize: '10px', color: '#38bdf8' }}>Chủ Thẻ VIP</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#ffffff' }}>
+                  {userProfile.fullName}
+                </div>
+                <div style={{ fontSize: '10px', color: '#38bdf8' }}>
+                  {userProfile.nickname ? `@${userProfile.nickname}` : (userProfile.role ?? 'Chủ Thẻ VIP')}
+                </div>
               </div>
 
               <a
                 href="/api/auth/logout"
+                onClick={(e) => e.stopPropagation()}
                 style={{
                   color: '#fca5a5',
                   background: 'rgba(239, 68, 68, 0.15)',
@@ -933,349 +1069,641 @@ export default function FullscreenDashboard() {
           {/* ========================================================================= */}
           {activeTab === 'cards' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
                   <h2 style={{ fontSize: '22px', fontWeight: 800, margin: 0, color: '#ffffff' }}>Quản Lý Tất Cả Thẻ Cá Nhân ({cards.length})</h2>
                   <div style={{ fontSize: '13px', color: '#94a3b8' }}>Bấm vào bất kỳ thẻ nào để mở xem chi tiết & tương tác 3D</div>
                 </div>
 
-                <button
-                  onClick={() => setIsAddCardOpen(true)}
-                  style={{
-                    padding: '10px 20px',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
-                    color: '#ffffff',
-                    border: 'none',
-                    fontWeight: 700,
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    boxShadow: '0 0 20px rgba(56, 189, 248, 0.35)',
-                  }}
-                >
-                  <PlusOutlined /> + Thêm thẻ mới
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  {/* View Mode Switcher: Lưới / Bảng / Danh sách */}
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      background: 'rgba(15, 23, 42, 0.85)',
+                      padding: '4px',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      gap: '4px',
+                      boxShadow: '0 4px 15px rgba(0, 0, 0, 0.25)',
+                    }}
+                  >
+                    <button
+                      onClick={() => handleCardsViewModeChange('grid')}
+                      title="Chế độ xem dạng lưới (Cards)"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 14px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: cardsViewMode === 'grid' ? 'rgba(56, 189, 248, 0.2)' : 'transparent',
+                        color: cardsViewMode === 'grid' ? '#38bdf8' : '#94a3b8',
+                        fontWeight: cardsViewMode === 'grid' ? 700 : 500,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        boxShadow: cardsViewMode === 'grid' ? '0 0 10px rgba(56, 189, 248, 0.2)' : 'none',
+                      }}
+                    >
+                      <AppstoreOutlined />
+                      <span>Lưới</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleCardsViewModeChange('table')}
+                      title="Chế độ xem dạng bảng chi tiết (Table)"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 14px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: cardsViewMode === 'table' ? 'rgba(56, 189, 248, 0.2)' : 'transparent',
+                        color: cardsViewMode === 'table' ? '#38bdf8' : '#94a3b8',
+                        fontWeight: cardsViewMode === 'table' ? 700 : 500,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        boxShadow: cardsViewMode === 'table' ? '0 0 10px rgba(56, 189, 248, 0.2)' : 'none',
+                      }}
+                    >
+                      <TableOutlined />
+                      <span>Bảng</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleCardsViewModeChange('list')}
+                      title="Chế độ xem dạng danh sách rút gọn (List)"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 14px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: cardsViewMode === 'list' ? 'rgba(56, 189, 248, 0.2)' : 'transparent',
+                        color: cardsViewMode === 'list' ? '#38bdf8' : '#94a3b8',
+                        fontWeight: cardsViewMode === 'list' ? 700 : 500,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        boxShadow: cardsViewMode === 'list' ? '0 0 10px rgba(56, 189, 248, 0.2)' : 'none',
+                      }}
+                    >
+                      <UnorderedListOutlined />
+                      <span>Danh sách</span>
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => setIsAddCardOpen(true)}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '12px',
+                      background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontWeight: 700,
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: '0 0 20px rgba(56, 189, 248, 0.35)',
+                    }}
+                  >
+                    <PlusOutlined /> + Thêm thẻ mới
+                  </button>
+                </div>
               </div>
 
-              {/* Interactive Cards Grid List */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-                {cards.map((card) => {
-                  const isSelected = card.id === activeCardId;
-                  return (
-                    <div
-                      key={card.id}
-                      onClick={() => handleSelectCard(card.id, true)}
-                      style={{
-                        background: 'rgba(15, 23, 42, 0.75)',
-                        border: isSelected ? '2px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: '20px',
-                        padding: '24px',
-                        boxShadow: isSelected ? '0 0 25px rgba(56, 189, 248, 0.25)' : '0 10px 30px rgba(0,0,0,0.3)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        position: 'relative',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                      }}
-                      className="my-card-grid-item"
-                    >
-                      {card.isDefault && (
-                        <span style={{ position: 'absolute', top: '16px', right: '16px', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 700 }}>
-                          <StarOutlined /> THẺ MẶC ĐỊNH
-                        </span>
-                      )}
+              {/* DẠNG 1: LƯỚI (GRID VIEW) */}
+              {cardsViewMode === 'grid' && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+                  {cards.map((card) => {
+                    const isSelected = card.id === activeCardId;
+                    return (
+                      <div
+                        key={card.id}
+                        onClick={() => handleSelectCard(card.id, true)}
+                        style={{
+                          background: 'rgba(15, 23, 42, 0.75)',
+                          border: isSelected ? '2px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '20px',
+                          padding: '24px',
+                          boxShadow: isSelected ? '0 0 25px rgba(56, 189, 248, 0.25)' : '0 10px 30px rgba(0,0,0,0.3)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          position: 'relative',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                        }}
+                        className="my-card-grid-item"
+                      >
+                        {card.isDefault && (
+                          <span style={{ position: 'absolute', top: '16px', right: '16px', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 700 }}>
+                            <StarOutlined /> THẺ MẶC ĐỊNH
+                          </span>
+                        )}
 
-                      <div>
-                        <div style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 700, marginBottom: '4px' }}>{card.bankName}</div>
-                        <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', fontWeight: 800, color: '#ffffff' }}>{card.nickname}</h3>
+                        <div>
+                          <div style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 700, marginBottom: '4px' }}>{card.bankName}</div>
+                          <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', fontWeight: 800, color: '#ffffff' }}>{card.nickname}</h3>
 
-                        <div style={{ fontFamily: 'monospace', fontSize: '16px', fontWeight: 700, color: '#cbd5e1', letterSpacing: '2px', marginBottom: '16px' }}>
-                          •••• •••• •••• {card.lastFourDigits}
-                        </div>
+                          <div style={{ fontFamily: 'monospace', fontSize: '16px', fontWeight: 700, color: '#cbd5e1', letterSpacing: '2px', marginBottom: '16px' }}>
+                            •••• •••• •••• {card.lastFourDigits}
+                          </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12px', color: '#94a3b8', background: 'rgba(30, 41, 59, 0.5)', padding: '12px', borderRadius: '12px', marginBottom: '20px' }}>
-                          <div>
-                            <div>Hạn mức ngày:</div>
-                            <div style={{ color: '#ffffff', fontWeight: 700 }}>
-                              {isBalanceHidden ? '•••••••• ₫' : `${card.dailyLimit.toLocaleString('vi-VN')} ₫`}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12px', color: '#94a3b8', background: 'rgba(30, 41, 59, 0.5)', padding: '12px', borderRadius: '12px', marginBottom: '20px' }}>
+                            <div>
+                              <div>Hạn mức ngày:</div>
+                              <div style={{ color: '#ffffff', fontWeight: 700 }}>
+                                {isBalanceHidden ? '•••••••• ₫' : `${card.dailyLimit.toLocaleString('vi-VN')} ₫`}
+                              </div>
+                            </div>
+                            <div>
+                              <div>Trạng thái:</div>
+                              <div style={{ color: card.isLocked ? '#fca5a5' : '#4ade80', fontWeight: 700 }}>{card.isLocked ? '🔒 Đã khóa' : '⚡ Hoạt động'}</div>
                             </div>
                           </div>
-                          <div>
-                            <div>Trạng thái:</div>
-                            <div style={{ color: card.isLocked ? '#fca5a5' : '#4ade80', fontWeight: 700 }}>{card.isLocked ? '🔒 Đã khóa' : '⚡ Hoạt động'}</div>
-                          </div>
                         </div>
-                      </div>
 
-                      {/* Card Actions Buttons (stopPropagation prevents duplicate modal opens) */}
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectCard(card.id, true);
-                          }}
-                          style={{
-                            flex: 1,
-                            padding: '8px 0',
-                            borderRadius: '10px',
-                            background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
-                            border: 'none',
-                            color: '#ffffff',
-                            fontWeight: 700,
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          🔍 Xem chi tiết 3D
-                        </button>
-
-                        {!card.isDefault && (
+                        {/* Card Actions Buttons */}
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleSetDefaultCard(card.id);
+                              handleSelectCard(card.id, true);
                             }}
                             style={{
-                              padding: '8px 12px',
+                              flex: 1,
+                              padding: '8px 0',
                               borderRadius: '10px',
-                              background: 'rgba(255,255,255,0.05)',
-                              border: '1px solid rgba(255,255,255,0.1)',
-                              color: '#cbd5e1',
+                              background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
+                              border: 'none',
+                              color: '#ffffff',
+                              fontWeight: 700,
                               fontSize: '12px',
                               cursor: 'pointer',
                             }}
                           >
-                            Đặt mặc định
+                            🔍 Xem chi tiết 3D
                           </button>
-                        )}
 
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleLock(card.id);
-                          }}
-                          style={{
-                            padding: '8px 12px',
-                            borderRadius: '10px',
-                            background: card.isLocked ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.15)',
-                            border: `1px solid ${card.isLocked ? 'rgba(239, 68, 68, 0.4)' : 'rgba(34, 197, 94, 0.3)'}`,
-                            color: card.isLocked ? '#fca5a5' : '#4ade80',
-                            fontSize: '12px',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {card.isLocked ? 'Mở khóa' : 'Khóa thẻ'}
-                        </button>
+                          {!card.isDefault && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSetDefaultCard(card.id);
+                              }}
+                              style={{
+                                padding: '8px 12px',
+                                borderRadius: '10px',
+                                background: 'rgba(255,255,255,0.05)',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                color: '#cbd5e1',
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Đặt mặc định
+                            </button>
+                          )}
 
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteCard(card.id);
-                          }}
-                          style={{
-                            padding: '8px 12px',
-                            borderRadius: '10px',
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                            color: '#94a3b8',
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Xóa
-                        </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleLock(card.id);
+                            }}
+                            style={{
+                              padding: '8px 12px',
+                              borderRadius: '10px',
+                              background: card.isLocked ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.15)',
+                              border: `1px solid ${card.isLocked ? 'rgba(239, 68, 68, 0.4)' : 'rgba(34, 197, 94, 0.3)'}`,
+                              color: card.isLocked ? '#fca5a5' : '#4ade80',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {card.isLocked ? 'Mở khóa' : 'Khóa thẻ'}
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteCard(card.id);
+                            }}
+                            style={{
+                              padding: '8px 12px',
+                              borderRadius: '10px',
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              color: '#94a3b8',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Xóa
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* DẠNG 2: BẢNG CHI TIẾT (TABLE VIEW) */}
+              {cardsViewMode === 'table' && (
+                <div
+                  style={{
+                    background: 'rgba(15, 23, 42, 0.75)',
+                    borderRadius: '20px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    overflow: 'hidden',
+                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+                  }}
+                >
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '780px' }}>
+                      <thead>
+                        <tr style={{ background: 'rgba(30, 41, 59, 0.65)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                          <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Thẻ & Ngân hàng</th>
+                          <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Số thẻ & Loại</th>
+                          <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Chủ thẻ</th>
+                          <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Hạn mức ngày</th>
+                          <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Hết hạn</th>
+                          <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Trạng thái</th>
+                          <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Thao tác</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cards.map((card) => {
+                          const isSelected = card.id === activeCardId;
+                          return (
+                            <tr
+                              key={card.id}
+                              onClick={() => handleSelectCard(card.id, true)}
+                              style={{
+                                borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                                cursor: 'pointer',
+                                background: isSelected ? 'rgba(56, 189, 248, 0.08)' : 'transparent',
+                                transition: 'background 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isSelected) e.currentTarget.style.background = 'transparent';
+                              }}
+                            >
+                              {/* Thẻ & Ngân hàng */}
+                              <td style={{ padding: '16px 20px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  <div
+                                    style={{
+                                      width: '36px',
+                                      height: '24px',
+                                      borderRadius: '6px',
+                                      background: getCardMiniGradient(card.theme),
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: '#ffffff',
+                                      fontSize: '13px',
+                                      boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    <CreditCardOutlined />
+                                  </div>
+                                  <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span style={{ fontWeight: 700, color: '#ffffff', fontSize: '14px' }}>{card.nickname}</span>
+                                      {card.isDefault && (
+                                        <span style={{ background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', fontSize: '10px', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                                          MẶC ĐỊNH
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: '#38bdf8' }}>{card.bankName}</div>
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Số thẻ & Loại */}
+                              <td style={{ padding: '16px 20px' }}>
+                                <div style={{ fontFamily: 'monospace', fontWeight: 600, color: '#cbd5e1', fontSize: '13px', letterSpacing: '1px' }}>
+                                  •••• {card.lastFourDigits}
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#94a3b8' }}>{card.cardType || 'Thẻ ảo'}</div>
+                              </td>
+
+                              {/* Chủ thẻ */}
+                              <td style={{ padding: '16px 20px', color: '#e2e8f0', fontSize: '13px', fontWeight: 600 }}>
+                                {card.holderName}
+                              </td>
+
+                              {/* Hạn mức ngày */}
+                              <td style={{ padding: '16px 20px', color: '#ffffff', fontSize: '13px', fontWeight: 700 }}>
+                                {isBalanceHidden ? '•••••••• ₫' : `${card.dailyLimit.toLocaleString('vi-VN')} ₫`}
+                              </td>
+
+                              {/* Ngày hết hạn */}
+                              <td style={{ padding: '16px 20px', color: '#94a3b8', fontSize: '13px' }}>
+                                {card.expiryDate}
+                              </td>
+
+                              {/* Trạng thái */}
+                              <td style={{ padding: '16px 20px' }}>
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    padding: '3px 8px',
+                                    borderRadius: '6px',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    background: card.isLocked ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+                                    color: card.isLocked ? '#fca5a5' : '#4ade80',
+                                    border: `1px solid ${card.isLocked ? 'rgba(239, 68, 68, 0.3)' : 'rgba(34, 197, 94, 0.3)'}`,
+                                  }}
+                                >
+                                  {card.isLocked ? '🔒 Đã khóa' : '⚡ Hoạt động'}
+                                </span>
+                              </td>
+
+                              {/* Thao tác */}
+                              <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
+                                  <button
+                                    onClick={() => handleSelectCard(card.id, true)}
+                                    title="Xem chi tiết 3D"
+                                    style={{
+                                      padding: '6px 12px',
+                                      borderRadius: '8px',
+                                      background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
+                                      border: 'none',
+                                      color: '#ffffff',
+                                      fontSize: '12px',
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    3D
+                                  </button>
+
+                                  {!card.isDefault && (
+                                    <button
+                                      onClick={() => handleSetDefaultCard(card.id)}
+                                      title="Đặt làm thẻ mặc định"
+                                      style={{
+                                        padding: '6px 10px',
+                                        borderRadius: '8px',
+                                        background: 'rgba(255,255,255,0.06)',
+                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        color: '#cbd5e1',
+                                        fontSize: '12px',
+                                        cursor: 'pointer',
+                                      }}
+                                    >
+                                      Mặc định
+                                    </button>
+                                  )}
+
+                                  <button
+                                    onClick={() => handleToggleLock(card.id)}
+                                    title={card.isLocked ? 'Mở khóa thẻ' : 'Khóa thẻ'}
+                                    style={{
+                                      padding: '6px 10px',
+                                      borderRadius: '8px',
+                                      background: card.isLocked ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.15)',
+                                      border: `1px solid ${card.isLocked ? 'rgba(239, 68, 68, 0.4)' : 'rgba(34, 197, 94, 0.3)'}`,
+                                      color: card.isLocked ? '#fca5a5' : '#4ade80',
+                                      fontSize: '12px',
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    {card.isLocked ? 'Mở' : 'Khóa'}
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleDeleteCard(card.id)}
+                                    title="Xóa thẻ"
+                                    style={{
+                                      padding: '6px 10px',
+                                      borderRadius: '8px',
+                                      background: 'rgba(255, 255, 255, 0.05)',
+                                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                                      color: '#94a3b8',
+                                      fontSize: '12px',
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    Xóa
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* DẠNG 3: DANH SÁCH RÚT GỌN (COMPACT LIST VIEW) */}
+              {cardsViewMode === 'list' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {cards.map((card) => {
+                    const isSelected = card.id === activeCardId;
+                    return (
+                      <div
+                        key={card.id}
+                        onClick={() => handleSelectCard(card.id, true)}
+                        style={{
+                          background: 'rgba(15, 23, 42, 0.75)',
+                          border: isSelected ? '2px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '16px',
+                          padding: '16px 20px',
+                          boxShadow: isSelected ? '0 0 20px rgba(56, 189, 248, 0.2)' : '0 4px 20px rgba(0, 0, 0, 0.25)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          gap: '16px',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        {/* Bên trái: Icon Thẻ & Thông tin */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', minWidth: '260px' }}>
+                          <div
+                            style={{
+                              width: '46px',
+                              height: '30px',
+                              borderRadius: '8px',
+                              background: getCardMiniGradient(card.theme),
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#ffffff',
+                              fontSize: '16px',
+                              boxShadow: '0 4px 10px rgba(0, 0, 0, 0.3)',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <CreditCardOutlined />
+                          </div>
+
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff' }}>{card.nickname}</span>
+                              {card.isDefault && (
+                                <span style={{ background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 700 }}>
+                                  <StarOutlined /> MẶC ĐỊNH
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 600 }}>
+                              {card.bankName} • <span style={{ fontFamily: 'monospace', color: '#cbd5e1' }}>•••• {card.lastFourDigits}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Ở giữa: Chỉ số & Trạng thái */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '28px', flexWrap: 'wrap' }}>
+                          <div>
+                            <div style={{ fontSize: '11px', color: '#94a3b8' }}>Hạn mức ngày</div>
+                            <div style={{ fontSize: '13px', fontWeight: 700, color: '#ffffff' }}>
+                              {isBalanceHidden ? '•••••••• ₫' : `${card.dailyLimit.toLocaleString('vi-VN')} ₫`}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div style={{ fontSize: '11px', color: '#94a3b8' }}>Hết hạn</div>
+                            <div style={{ fontSize: '13px', color: '#cbd5e1', fontWeight: 600 }}>{card.expiryDate}</div>
+                          </div>
+
+                          <div>
+                            <div style={{ fontSize: '11px', color: '#94a3b8' }}>Trạng thái</div>
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '2px 8px',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                background: card.isLocked ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+                                color: card.isLocked ? '#fca5a5' : '#4ade80',
+                              }}
+                            >
+                              {card.isLocked ? '🔒 Đã khóa' : '⚡ Hoạt động'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Bên phải: Cụm nút hành động */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => handleSelectCard(card.id, true)}
+                            style={{
+                              padding: '8px 14px',
+                              borderRadius: '10px',
+                              background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
+                              border: 'none',
+                              color: '#ffffff',
+                              fontWeight: 700,
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            🔍 Xem 3D
+                          </button>
+
+                          {!card.isDefault && (
+                            <button
+                              onClick={() => handleSetDefaultCard(card.id)}
+                              style={{
+                                padding: '8px 12px',
+                                borderRadius: '10px',
+                                background: 'rgba(255,255,255,0.05)',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                color: '#cbd5e1',
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Đặt mặc định
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => handleToggleLock(card.id)}
+                            style={{
+                              padding: '8px 12px',
+                              borderRadius: '10px',
+                              background: card.isLocked ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.15)',
+                              border: `1px solid ${card.isLocked ? 'rgba(239, 68, 68, 0.4)' : 'rgba(34, 197, 94, 0.3)'}`,
+                              color: card.isLocked ? '#fca5a5' : '#4ade80',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {card.isLocked ? 'Mở khóa' : 'Khóa'}
+                          </button>
+
+                          <button
+                            onClick={() => handleDeleteCard(card.id)}
+                            style={{
+                              padding: '8px 12px',
+                              borderRadius: '10px',
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              color: '#94a3b8',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Xóa
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
           {/* ========================================================================= */}
           {/* TAB 3: GIAO DỊCH (TRANSACTIONS) */}
           {/* ========================================================================= */}
+          {/* TAB 3: GIAO DỊCH & QUẢN LÝ THU CHI (EXPENSE MANAGER) */}
+          {/* ========================================================================= */}
           {activeTab === 'transactions' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-                <div>
-                  <h2 style={{ fontSize: '22px', fontWeight: 800, margin: 0, color: '#ffffff' }}>Lịch Sử Giao Dịch Chi Tiết</h2>
-                  <div style={{ fontSize: '13px', color: '#94a3b8' }}>Quản lý và xuất báo cáo toàn bộ các khoản chi tiêu & hoàn tiền</div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setIsExportReportOpen(true)}
-                  style={{
-                    padding: '10px 18px',
-                    borderRadius: '10px',
-                    background: 'rgba(56, 189, 248, 0.15)',
-                    border: '1px solid rgba(56, 189, 248, 0.3)',
-                    color: '#38bdf8',
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s',
-                  }}
-                  title="Xem trước & Xuất báo cáo sao kê CSV/PDF"
-                >
-                  <DownloadOutlined /> Xem & Xuất Báo Cáo CSV/PDF
-                </button>
-              </div>
-
-              {/* Advanced Filter Bar */}
-              <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '16px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-                {/* Search */}
-                <div style={{ flex: 1, minWidth: '220px', display: 'flex', alignItems: 'center', background: 'rgba(30, 41, 59, 0.6)', padding: '8px 12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                  <SearchOutlined style={{ color: '#64748b', marginRight: '8px', flexShrink: 0 }} />
-                  <input
-                    type="search"
-                    name="tab_search_tx_no_autofill"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    autoCapitalize="off"
-                    spellCheck="false"
-                    placeholder="Tìm merchant, đơn vị chi tiêu, thẻ..."
-                    value={txSearchQuery}
-                    onChange={(e) => setTxSearchQuery(e.target.value)}
-                    style={{ background: 'transparent', border: 'none', outline: 'none', color: '#ffffff', fontSize: '13px', width: '100%' }}
-                  />
-                  {txSearchQuery ? (
-                    <button
-                      type="button"
-                      onClick={() => setTxSearchQuery('')}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#94a3b8',
-                        cursor: 'pointer',
-                        padding: '2px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        flexShrink: 0,
-                      }}
-                      title="Xóa tìm kiếm"
-                    >
-                      <CloseCircleFilled style={{ fontSize: '14px' }} />
-                    </button>
-                  ) : null}
-                </div>
-
-                {/* Card Select */}
-                <select value={txCardFilter} onChange={(e) => setTxCardFilter(e.target.value)} style={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#ffffff', padding: '8px 14px', borderRadius: '10px', fontSize: '13px' }}>
-                  <option value="all">Tất cả các thẻ</option>
-                  {cards.map((c) => (
-                    <option key={c.id} value={c.id}>{c.nickname} (•••• {c.lastFourDigits})</option>
-                  ))}
-                </select>
-
-                {/* Type Select */}
-                <select value={txTypeFilter} onChange={(e) => setTxTypeFilter(e.target.value as any)} style={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#ffffff', padding: '8px 14px', borderRadius: '10px', fontSize: '13px' }}>
-                  <option value="all">Tất cả loại GD</option>
-                  <option value="expense">Chi tiêu (-)</option>
-                  <option value="income">Hoàn tiền (+)</option>
-                </select>
-
-                {/* Time Select */}
-                <select value={txTimeFilter} onChange={(e) => setTxTimeFilter(e.target.value as any)} style={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#ffffff', padding: '8px 14px', borderRadius: '10px', fontSize: '13px' }}>
-                  <option value="all">Tất cả thời gian</option>
-                  <option value="today">Hôm nay</option>
-                  <option value="week">Tuần này</option>
-                </select>
-              </div>
-
-              {/* Transactions Feed Grouped List */}
-              <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '20px', padding: '24px' }}>
-                {filteredTransactions.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '48px 16px' }}>
-                    <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(30, 41, 59, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto', color: '#64748b', fontSize: '26px' }}>
-                      <InboxOutlined />
-                    </div>
-                    <h4 style={{ margin: '0 0 6px 0', fontSize: '16px', fontWeight: 700, color: '#f8fafc' }}>
-                      Không Tìm Thấy Giao Dịch Phù Hợp
-                    </h4>
-                    <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: '#94a3b8', maxWidth: '380px', marginInline: 'auto', lineHeight: '1.45' }}>
-                      {txSearchQuery
-                        ? `Không có giao dịch nào khớp với từ khóa "${txSearchQuery}".`
-                        : 'Không có giao dịch nào khớp với bộ lọc đã chọn.'}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTxSearchQuery('');
-                        setTxCardFilter('all');
-                        setTxTypeFilter('all');
-                        setTxTimeFilter('all');
-                      }}
-                      style={{
-                        padding: '10px 20px',
-                        borderRadius: '12px',
-                        background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
-                        border: 'none',
-                        color: '#ffffff',
-                        fontSize: '13px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 14px rgba(2, 132, 199, 0.3)',
-                      }}
-                    >
-                      Xóa Bộ Lọc & Xem Tất Cả
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                    {filteredTransactions.map((tx) => (
-                      <div
-                        key={tx.id}
-                        onClick={() => setSelectedTxDetail(tx)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '16px',
-                          background: 'rgba(30, 41, 59, 0.4)',
-                          border: '1px solid rgba(255, 255, 255, 0.05)',
-                          borderRadius: '14px',
-                          cursor: 'pointer',
-                          transition: 'background 0.2s',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                          <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(15, 23, 42, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
-                            {getCategoryIcon(tx.category)}
-                          </div>
-                          <div>
-                            <div style={{ fontSize: '15px', fontWeight: 700, color: '#ffffff' }}>{tx.merchant}</div>
-                            <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
-                              {tx.dateDisplay} • {tx.time} • Thẻ •••• {tx.cardLast4} • Mã: {tx.referenceId}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: '16px', fontWeight: 800, color: tx.amount > 0 ? '#4ade80' : '#f8fafc' }}>
-                            {tx.amount > 0 ? `+${tx.amount.toLocaleString('vi-VN')} ₫` : `${tx.amount.toLocaleString('vi-VN')} ₫`}
-                          </div>
-                          <span style={{ fontSize: '11px', color: '#38bdf8', fontWeight: 600 }}>{tx.status}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <TransactionExpenseManager
+              transactions={transactions}
+              cards={cards}
+              isBalanceHidden={isBalanceHidden}
+              onToggleBalance={() => setIsBalanceHidden((prev) => !prev)}
+              onAddTransaction={handleAddTransaction}
+              onOpenExportReport={() => setIsExportReportOpen(true)}
+              onToast={showToast}
+            />
           )}
 
-          {/* ========================================================================= */}
-          {/* TAB 4: THỐNG KÊ (STATS) */}
           {/* ========================================================================= */}
           {activeTab === 'stats' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -1372,41 +1800,16 @@ export default function FullscreenDashboard() {
           {/* ========================================================================= */}
           {/* TAB 5: CÀI ĐẶT (SETTINGS) */}
           {/* ========================================================================= */}
+          {/* TAB 5: CÀI ĐẶT & BẢO MẬT (SETTINGS HUB) */}
+          {/* ========================================================================= */}
           {activeTab === 'settings' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '800px' }}>
-              <div>
-                <h2 style={{ fontSize: '22px', fontWeight: 800, margin: 0, color: '#ffffff' }}>Cài Đặt Tài Khoản & Bảo Mật</h2>
-                <div style={{ fontSize: '13px', color: '#94a3b8' }}>Quản lý quyền riêng tư, cấu hình sinh trắc học và phiên làm việc OIDC</div>
-              </div>
-
-              <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '20px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                  <div>
-                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#ffffff' }}>Đăng nhập bằng Face ID / Sinh trắc học</div>
-                    <div style={{ fontSize: '12px', color: '#94a3b8' }}>Cho phép xác thực vân tay / khuôn mặt khi truy cập ứng dụng</div>
-                  </div>
-                  <input type="checkbox" defaultChecked style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                  <div>
-                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#ffffff' }}>Tự động ẩn số thẻ & mã CVV</div>
-                    <div style={{ fontSize: '12px', color: '#94a3b8' }}>Tự động che số thẻ sau 10 giây để chống nhìn lén</div>
-                  </div>
-                  <input type="checkbox" defaultChecked style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#ffffff' }}>Phiên làm việc OIDC Enterprise</div>
-                    <div style={{ fontSize: '12px', color: '#94a3b8' }}>Phiên hoạt động an toàn được quản lý bởi `fe-kit/server` Cookie Proxy</div>
-                  </div>
-                  <span style={{ fontSize: '12px', color: '#4ade80', background: 'rgba(34, 197, 94, 0.15)', padding: '4px 10px', borderRadius: '8px', fontWeight: 700 }}>
-                    ⚡ ĐANG HOẠT ĐỘNG
-                  </span>
-                </div>
-              </div>
-            </div>
+            <AppSettingsHub
+              userProfile={userProfile}
+              onProfileSave={handleProfileSave}
+              isBalanceHidden={isBalanceHidden}
+              onToggleBalance={() => setIsBalanceHidden((prev) => !prev)}
+              onToast={showToast}
+            />
           )}
         </main>
       </div>

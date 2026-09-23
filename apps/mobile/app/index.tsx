@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
+import type { TextStyle } from 'react-native';
 import { env } from '@cardflow-app/shared';
 import { defaultTokens } from 'fe-kit/tokens';
 
@@ -9,14 +10,14 @@ const t = defaultTokens('light');
 export default function Home() {
   return (
     <View style={styles.root}>
-      <Text style={styles.title}>Cardflow app</Text>
-      <Text style={styles.muted}>Môi trường: {env.current()}</Text>
+      <Text style={styles.title as TextStyle}>Cardflow app</Text>
+      <Text style={styles.muted as TextStyle}>Môi trường: {env.current()}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: t.color.background },
-  title: { fontSize: t.typography.size.xxl, fontWeight: '600', color: t.color.text },
-  muted: { marginTop: t.spacing.sm, color: t.color.textMuted },
+  title: { fontSize: 24, fontWeight: '600', color: t.color.text },
+  muted: { marginTop: 8, color: t.color.textMuted },
 });

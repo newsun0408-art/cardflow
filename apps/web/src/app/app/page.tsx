@@ -1,16 +1,35 @@
-// Trang cần phiên. Middleware đã chặn trước khi tới đây, nên chỗ này chỉ việc
-// đọc cookie — nhưng phán quyết cuối vẫn là của backend, không phải của trang.
-import { cookies } from 'next/headers';
-import { sessionCookies } from '@/lib/session';
+import { Button, Card, Col, Row, Space, Statistic } from 'antd';
 
-export default async function AppHome() {
-  const session = sessionCookies.read(await cookies());
+const SUMMARY = [
+  { title: 'Thẻ đang hoạt động', value: 3 },
+  { title: 'Số dư khả dụng', value: 12500000, suffix: '₫' },
+  { title: 'Giao dịch tháng này', value: 24 },
+  { title: 'Cần xác nhận', value: 1 },
+];
+
+export default function AppHome() {
   return (
-    <main style={{ padding: 'var(--fk-space-xl)' }}>
-      <h1>Khu vực đã đăng nhập</h1>
-      <p>tenant: {session.tenantId ?? '(chưa chọn)'}</p>
-      <p>realm: {session.realm ?? '(mặc định)'}</p>
-      <a href="/api/auth/logout">Đăng xuất</a>
-    </main>
+    <Space orientation="vertical" size="large" style={{ display: 'flex' }}>
+      <div>
+        <h1>Dashboard</h1>
+        <p>Theo dõi nhanh tình trạng thẻ và giao dịch của bạn.</p>
+      </div>
+
+      <Row gutter={[16, 16]}>
+        {SUMMARY.map(({ title, value, suffix }) => (
+          <Col key={title} lg={6} md={12} xs={24}>
+            <Card><Statistic title={title} value={value} suffix={suffix} /></Card>
+          </Col>
+        ))}
+      </Row>
+
+      <Card title="Thao tác nhanh">
+        <Space wrap>
+          <Button href="/app/cards" type="primary">Xem danh sách thẻ</Button>
+          <Button href="/app/transactions">Lịch sử giao dịch</Button>
+          <Button href="/app/settings">Cài đặt tài khoản</Button>
+        </Space>
+      </Card>
+    </Space>
   );
 }

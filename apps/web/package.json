@@ -9,10 +9,11 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@cardflow-app/shared": "workspace:*",
+    "@ant-design/icons": "^6.3.4",
     "@ant-design/nextjs-registry": "^1.3.0",
+    "@cardflow-app/shared": "workspace:*",
     "antd": "^6.6.3",
-    "fe-kit": "github:bangdinh/fe-kit#v0.1.0",
+    "fe-kit": "github:bangdinh/fe-kit#main",
     "next": "^16.3.5",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"

@@ -1,0 +1,49 @@
+﻿{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "🚀 Start Fullstack (Dev)",
+      "dependsOn": ["🐳 Start Database (Docker)", "⚙️ Start Go Backend", "🌐 Start Web App"],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "🐳 Start Database (Docker)",
+      "type": "shell",
+      "command": "docker compose -f cardflow-backend/docker-compose.yml up -d postgres redis",
+      "problemMatcher": []
+    },
+    {
+      "label": "⚙️ Start Go Backend",
+      "type": "shell",
+      "options": {
+        "cwd": "${workspaceFolder}/cardflow-backend"
+      },
+      "command": "go run ./cmd/server",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "🌐 Start Web App",
+      "type": "shell",
+      "options": {
+        "cwd": "${workspaceFolder}/cardflow-app"
+      },
+      "command": "pnpm --filter @cardflow-app/web dev",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "🛑 Stop Database (Docker)",
+      "type": "shell",
+      "command": "docker compose -f cardflow-backend/docker-compose.yml stop postgres redis",
+      "problemMatcher": []
+    },
+    {
+      "label": "🧪 Run All Type-Checks & Lints",
+      "type": "shell",
+      "command": "cd cardflow-app && pnpm type-check && pnpm lint && cd ../cardflow-backend && go test ./...",
+      "problemMatcher": []
+    }
+  ]
+}

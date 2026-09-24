@@ -1,0 +1,22 @@
+﻿{
+  "project": "cardflow",
+  "mcpServers": {
+    "tencent-memory": {
+      "command": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "--no-warnings",
+        "C:\\Users\\Tan\\agents-memory\\MemoryKnowledge\\node_modules\\tsx\\dist\\cli.mjs",
+        "C:\\Users\\Tan\\agents-memory\\MemoryKnowledge\\src\\mcp\\server.ts"
+      ],
+      "env": {
+        "AGENT_NAME": "Claude Agent",
+        "MCP_SERVER_NAME": "tencent-memory",
+        "KNOWLEDGE_API_URL": "http://127.0.0.1:8424",
+        "KNOWLEDGE_API_TOKEN": "sk-mem-DoCCoj16vAcdqxDHysb8BVHQ1cEcukbN",
+        "KNOWLEDGE_SERVICE_ID": "default",
+        "KNOWLEDGE_TEAM_ID": "team-eyfi0qbljr",
+        "KNOWLEDGE_WIKI_ID": "wiki-8gbmr5d0"
+      }
+    }
+  }
+}

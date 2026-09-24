@@ -1,0 +1,30 @@
+.page,
+.sidebar {
+  display: flex;
+  width: 100%;
+}
+
+.profile {
+  align-items: center;
+  display: flex;
+  gap: var(--fk-space-md);
+}
+
+.profile p,
+.sidebar p,
+.page > div > p {
+  color: var(--fk-color-text-muted);
+  margin-block: var(--fk-space-xs) 0;
+}
+
+.fields {
+  display: grid;
+  gap: var(--fk-space-md);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--fk-space-xxl) * 6)), 1fr));
+}
+
+.fields label {
+  display: grid;
+  font-weight: var(--fk-font-weight-medium);
+  gap: var(--fk-space-xs);
+}

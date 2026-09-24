@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# commit-msg — ép đúng quy ước commit của repo. Nguồn luật: CONTRIBUTING.md §3.
+#
+# Bật hook: `make hooks` (hoặc `git config core.hooksPath .githooks`). Repo Go nên không có
+# postinstall tự chạy — mỗi clone phải bật một lần.
+#
+# Hook là hàng rào DUY NHẤT chạy trước khi commit tồn tại. Tài liệu và skill chỉ
+# là lời nhắc — cái này mới chặn được.
+set -u
+
+MSG_FILE="${1:?commit-msg hook cần đường dẫn file message}"
+# Dùng `awk NF` bỏ dòng trắng thay cho lớp ký tự POSIX space của sed: hai dấu ngoặc vuông
+# liền nhau trùng delimiter của cmd/scaffold nên bản trong templates/ không render được.
+# Cùng lý do, regex dưới viết `[\[]` thay vì dấu escape + lớp ký tự.
+SUBJECT="$(grep -v '^#' "$MSG_FILE" | awk 'NF' | head -n1)"
+
+# Commit do git tự sinh hoặc dùng để sửa commit khác — bỏ qua.
+case "$SUBJECT" in
+  "Merge branch"*|"Merge remote-tracking"*|"Merge tag"*|"Revert \""*|fixup!*|squash!*|amend!*)
+    exit 0 ;;
+esac
+
+# Commit release do `make release` / scripts/release.sh sinh: `chore(release): vX.Y.Z`.
+# Mô tả ngắn hơn 10 ký tự là ĐÚNG với dạng này — chặn nó là làm hỏng quy trình release.
+case "$SUBJECT" in
+  "chore(release): v"[0-9]*) exit 0 ;;
+esac
+
+TYPES='feat|fix|refactor|test|docs|chore|perf|ci|build|style|revert'
+# `[\[]` thay cho `\[`: hai dấu '[' liền nhau trùng delimiter của cmd/scaffold nên bản
+# trong templates/ không render được. Nghĩa regex không đổi.
+# Jira key: CONTRIBUTING.md §3 ghi BẮT BUỘC, nhưng đo 2026-09-04 chỉ 3/60 commit gần nhất có.
+# Ép ngay là chặn 95% cách team đang viết, nên tạm để TUỲ CHỌN. Chốt bắt buộc thì bỏ dấu `?`
+# sau nhóm `(\[...\] )` ở dòng PATTERN dưới — một ký tự, không cần sửa gì khác.
+# Mô tả: regex chỉ kiểm CÓ nội dung. Độ dài đo bằng python3 phía dưới — `.{10,}` của
+# grep -E đếm byte hay ký tự tuỳ locale, nên cùng message có thể đạt ở LC_ALL=C mà
+# chặn ở UTF-8 (đo 2026-09-04). Cổng phải tất định, không phụ thuộc locale caller.
+PATTERN="^([\[][A-Z][A-Z0-9]+-[0-9]+\] )?($TYPES)(\([a-z0-9._/,-]+\))?: ."
+
+fail() {
+  cat >&2 <<EOF
+
+✗ Commit message không đúng quy ước (CONTRIBUTING.md §3).
+
+  Message của bạn:
+    $SUBJECT
+
+  $1
+
+  Đúng dạng:
+    <type>(<scope>): <mô tả tiếng Việt, đọc là biết đã làm gì>
+    [RPA-1234] <type>(<scope>): <mô tả>          ← khi việc có ticket
+
+  type: $TYPES
+  scope: vùng ảnh hưởng — response, errors, domain, middleware, scaffold, api-standard...
+         nhiều mảng thì phân cách bằng dấu phẩy: (i18n,docs)
+
+  Ví dụ đạt:
+    feat(response): Page[T] trả data rỗng thành [] thay vì null
+    [B2B-123] fix(middleware): rbac bỏ qua route /healthz
+
+  Commit CHƯA được tạo — không dùng --amend (nó sẽ nhét thay đổi vào commit TRƯỚC
+  và giữ nguyên message cũ). Chạy lại git commit với message đúng.
+  KHÔNG dùng --no-verify để đi vòng — xem CONTRIBUTING.md §3.
+
+EOF
+  exit 1
+}
+
+[ -n "$SUBJECT" ] || fail "Message rỗng."
+
+if ! printf '%s' "$SUBJECT" | grep -qE "$PATTERN"; then
+  case "$SUBJECT" in
+    feature/*|bugfix/*|hotfix/*|refactor/*|chore/*)
+      fail "Đây là TÊN NHÁNH, không phải commit message." ;;
+    *:*) fail "Sai type, hoặc mô tả ngắn hơn 10 ký tự." ;;
+    *)   fail "Thiếu dấu hai chấm sau type(scope)." ;;
+  esac
+fi
+
+# Mô tả vô nghĩa — chặn riêng vì chúng vẫn khớp regex.
+DESC="$(printf '%s' "$SUBJECT" | sed -E "s/^([\[][A-Z][A-Z0-9]+-[0-9]+\] )?($TYPES)(\([a-z0-9._\/,-]+\))?: //")"
+if printf '%s' "$DESC" | grep -qiE '^(update code|fix bug|fix lỗi|done|wip|test|abc|commit [0-9]+|sửa code|cập nhật code|minor|misc|temp)\.?$'; then
+  fail "Mô tả không nói được đã làm gì: \"$DESC\"."
+fi
+
+# Độ dài dòng đầu, tính theo KÝ TỰ. Đo go-kit 2026-09-04 trên 60 commit: p50 71, p90 114;
+# 6/60 vượt 100, tất cả đều là commit nhồi nhiều việc (dài nhất 174). >72 nhắc, >100 chặn.
+command -v python3 >/dev/null || {
+  echo "" >&2
+  echo "✗ Hook cần python3 để đếm ký tự nhưng không tìm thấy trên PATH." >&2
+  echo "  Cài python3 rồi commit lại. KHÔNG dùng --no-verify." >&2
+  echo "" >&2
+  exit 1
+}
+
+# ${#SUBJECT} của bash đếm BYTE — tiếng Việt có dấu 2-3 byte/chữ nên bị phạt oan. Đếm ký tự.
+LEN="$(printf '%s' "$SUBJECT" | python3 -c 'import sys;print(len(sys.stdin.read()))')"
+LEN_DESC="$(printf '%s' "$DESC" | python3 -c 'import sys;print(len(sys.stdin.read()))')"
+if [ "$LEN_DESC" -lt 10 ]; then
+  fail "Mô tả chỉ $LEN_DESC ký tự (cần ≥ 10) — nói rõ đã làm gì."
+fi
+
+if [ "$LEN" -gt 100 ]; then
+  fail "Dòng đầu dài $LEN ký tự (trần 100). Dài vậy thường là commit gộp nhiều việc — tách commit, hoặc đẩy chi tiết xuống phần body."
+elif [ "$LEN" -gt 72 ]; then
+  echo "⚠ Dòng đầu $LEN ký tự (nên ≤ 72). Chi tiết nên xuống body." >&2
+fi
+
+exit 0

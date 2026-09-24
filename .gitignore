@@ -1,0 +1,82 @@
+# OS & System
+.DS_Store
+Thumbs.db
+
+# IDE & Editor Local Config
+.idea/
+*.swp
+*.swo
+
+# MCP Local Configs (Chứa token và đường dẫn máy local)
+**/.mcp.json
+.mcp.json
+.agents/
+**/.agents/
+
+# Environment variables & secrets (KHÔNG commit token / secrets)
+**/.env
+**/.env.local
+**/.env.*.local
+**/.env.*
+!**/.env.example
+!**/example.env
+
+# Backend application-config (Chỉ commit template và .gitkeep)
+**/application-config/**
+!**/application-config/example.*
+!**/application-config/.gitkeep
+
+# Local secrets & keys
+*.pem
+id_rsa
+firebase-secret.json
+.jira.env
+drive_store.json
+**/drive_store.json
+
+# Node & Frontend dependencies & build artifacts
+node_modules/
+**/node_modules/
+.turbo/
+**/.turbo/
+.next/
+**/.next/
+dist/
+**/dist/
+out/
+**/out/
+release/
+**/release/
+coverage/
+**/coverage/
+next-env.d.ts
+.expo/
+**/.expo/
+
+# Go & Backend binaries & build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.out
+coverage.html
+bin/
+**/bin/
+cardflow-backend/bin/
+/cardflow-backend/server
+/cardflow-backend/migrate
+/server
+/migrate
+
+# Go Workspace
+go.work
+go.work.sum
+
+# Git backups
+.git_backup/
+**/.git_backup/
+
+# Logs
+*.log
+**/*.log

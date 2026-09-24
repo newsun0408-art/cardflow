@@ -1,0 +1,461 @@
+# OpenAPI is the source of truth for this service's HTTP contract (VMSN-STD-API-001).
+# Keep it in the same PR as the implementation. Regenerate/adjust when endpoints change.
+openapi: 3.1.0
+info:
+  title: cardflow-backend
+  version: 0.1.0
+  description: cardflow-backend REST API. Success uses the `data` envelope (§06); errors use RFC 9457 ProblemDetail (§08).
+
+# Kong route is declared with strip_path=false, so the service receives the path
+# the client called — "cardflow-backend" prefix included. See kong-plugin/docs/kong-convention.md.
+servers:
+  - url: /cardflow-backend/v1
+
+# Clients send a Bearer token TO KONG. Kong verifies it via BRM, strips
+# Authorization, and hands this service X-Gateway-Token / X-User-Id / X-Tenant-Id
+# instead — so bearerAuth describes the edge, not this service's own door.
+# See docs/gateway-contract.md.
+security:
+  - bearerAuth: []
+
+paths:
+  /sample/actions/create:
+    post: 
+      operationId: createSample
+      summary: Create a sample
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSampleRequest' }
+      responses:
+        '201':
+          description: Created
+          headers:
+            Location: { schema: { type: string }, description: Canonical URI of the new resource }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SampleData' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '500': { $ref: '#/components/responses/Problem' }
+
+  /sample/actions/view/{sampleId}:
+    get:
+      operationId: getSampleById
+      summary: Get a sample by id
+      parameters:
+        - name: sampleId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SampleData' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '500': { $ref: '#/components/responses/Problem' }
+
+  # --- Google Drive Endpoints ---
+  /drive/actions/connect:
+    get:
+      operationId: connectDrive
+      summary: Initiate Google Drive OAuth flow
+      responses:
+        '200':
+          description: Auth URL generated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DriveConnectResponse' }
+        '400': { $ref: '#/components/responses/Problem' }
+
+  /drive/actions/callback:
+    get:
+      operationId: callbackDrive
+      summary: OAuth callback - exchanges code, connects Drive, and auto-imports files in CardFlow folder
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema: { type: string }
+        - name: state
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Connected successfully and imported CardFlow files
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DriveCallbackResponse' }
+        '400': { $ref: '#/components/responses/Problem' }
+
+  /drive/actions/files:
+    get:
+      operationId: listDriveFiles
+      summary: List Drive files
+      parameters:
+        - name: state
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: List of files
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DriveFile' }
+        '400': { $ref: '#/components/responses/Problem' }
+
+  /drive/actions/upload:
+    post:
+      operationId: uploadDriveFile
+      summary: Upload a file into the CardFlow folder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DriveUploadRequest' }
+      responses:
+        '200':
+          description: Uploaded file info
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DriveFile' }
+        '400': { $ref: '#/components/responses/Problem' }
+
+  /drive/actions/sync:
+    get:
+      operationId: syncCardFlowFiles
+      summary: Scan CardFlow folder and sync Excel and Sheet files
+      parameters:
+        - name: state
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Synced files
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DriveSyncResponse' }
+        '400': { $ref: '#/components/responses/Problem' }
+    post:
+      operationId: syncCardFlowFilesPost
+      summary: Scan CardFlow folder and sync Excel and Sheet files (POST)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                state: { type: string }
+              required: [state]
+      responses:
+        '200':
+          description: Synced files
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DriveSyncResponse' }
+        '400': { $ref: '#/components/responses/Problem' }
+
+  /drive/actions/imported:
+    get:
+      operationId: getImportedFiles
+      summary: Get list of imported Excel and Sheet files for state
+      parameters:
+        - name: state
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: List of imported files
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DriveFile' }
+        '400': { $ref: '#/components/responses/Problem' }
+
+  # --- Google Sheet Endpoints ---
+  /sheet/actions/create:
+    post:
+      operationId: createSpreadsheet
+      summary: Create a Google Sheet inside the CardFlow folder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSpreadsheetRequest' }
+      responses:
+        '200':
+          description: Created spreadsheet info
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SpreadsheetResponse' }
+        '400': { $ref: '#/components/responses/Problem' }
+
+  /sheet/actions/read:
+    get:
+      operationId: readSheetRows
+      summary: Read rows from a spreadsheet
+      parameters:
+        - name: state
+          in: query
+          required: true
+          schema: { type: string }
+        - name: spreadsheetId
+          in: query
+          required: true
+          schema: { type: string }
+        - name: range
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Rows data
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReadRowsResponse' }
+        '400': { $ref: '#/components/responses/Problem' }
+
+  /sheet/actions/append:
+    post:
+      operationId: appendSheetRows
+      summary: Append rows into a spreadsheet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AppendRowsRequest' }
+      responses:
+        '200':
+          description: Append result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppendRowsResponse' }
+        '400': { $ref: '#/components/responses/Problem' }
+
+  /sheet/actions/update:
+    put:
+      operationId: updateSheetRows
+      summary: Update rows in a spreadsheet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateRowsRequest' }
+      responses:
+        '200':
+          description: Update result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppendRowsResponse' }
+        '400': { $ref: '#/components/responses/Problem' }
+
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Problem:
+      description: RFC 9457 error
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  schemas:
+    # --- domain resource ---
+    Sample:
+      type: object
+      properties:
+        id:   { type: string, description: Opaque resource id }
+        name: { type: string }
+      required: [id, name]
+
+    CreateSampleRequest:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+      required: [name]
+
+    # --- success envelope (§06): {"data": {...}} ---
+    SampleData:
+      type: object
+      properties:
+        data: { $ref: '#/components/schemas/Sample' }
+      required: [data]
+
+    # --- collection envelope (§06): {"data": [...], "page": {...}} ---
+    SamplePage:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Sample' }
+        page: { $ref: '#/components/schemas/PageMeta' }
+      required: [data, page]
+
+    PageMeta:
+      type: object
+      properties:
+        limit:      { type: integer }
+        nextCursor: { type: string }
+        hasMore:    { type: boolean }
+        total:      { type: integer, description: Only when cheap to compute }
+      required: [hasMore]
+
+    # --- error (§08, RFC 9457) ---
+    ProblemDetail:
+      type: object
+      properties:
+        type:    { type: string, format: uri }
+        title:   { type: string }
+        status:  { type: integer }
+        code:    { type: string, description: Stable UPPER_SNAKE app error code; clients branch on this }
+        traceId: { type: string }
+        detail:  { type: string }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:  { type: string }
+              code:   { type: string }
+              reason: { type: string }
+      required: [type, title, status, code]
+
+    # --- Google Drive schemas ---
+    DriveConnectResponse:
+      type: object
+      properties:
+        state:   { type: string }
+        authUrl: { type: string }
+      required: [state, authUrl]
+
+    DriveCallbackResponse:
+      type: object
+      properties:
+        state:         { type: string }
+        tokenType:     { type: string }
+        expiry:        { type: string, format: date-time }
+        scope:         { type: string }
+        message:       { type: string }
+        connected:     { type: boolean }
+        accessUrl:     { type: string }
+        refreshUrl:    { type: string }
+        folderId:      { type: string }
+        folderName:    { type: string }
+        importedFiles:
+          type: array
+          items: { $ref: '#/components/schemas/DriveFile' }
+      required: [state, message, connected]
+
+    DriveFile:
+      type: object
+      properties:
+        id:         { type: string }
+        name:       { type: string }
+        mimeType:   { type: string }
+        webViewUrl: { type: string }
+        size:       { type: string }
+      required: [id, name]
+
+    DriveUploadRequest:
+      type: object
+      properties:
+        state:    { type: string }
+        fileName: { type: string }
+        content:  { type: string }
+        mimeType: { type: string }
+      required: [state, fileName, content]
+
+    DriveSyncResponse:
+      type: object
+      properties:
+        folderId:   { type: string }
+        folderName: { type: string }
+        files:
+          type: array
+          items: { $ref: '#/components/schemas/DriveFile' }
+        total:      { type: integer }
+      required: [folderId, folderName, files, total]
+
+    # --- Google Sheet schemas ---
+    CreateSpreadsheetRequest:
+      type: object
+      properties:
+        state: { type: string }
+        title: { type: string }
+      required: [state]
+
+    SpreadsheetResponse:
+      type: object
+      properties:
+        spreadsheetId:  { type: string }
+        title:          { type: string }
+        spreadsheetUrl: { type: string }
+        folderId:       { type: string }
+        folderName:     { type: string }
+      required: [spreadsheetId, title, spreadsheetUrl]
+
+    ReadRowsResponse:
+      type: object
+      properties:
+        spreadsheetId: { type: string }
+        range:         { type: string }
+        values:
+          type: array
+          items:
+            type: array
+            items: {}
+      required: [spreadsheetId, range, values]
+
+    AppendRowsRequest:
+      type: object
+      properties:
+        state:         { type: string }
+        spreadsheetId: { type: string }
+        range:         { type: string }
+        values:
+          type: array
+          items:
+            type: array
+            items: {}
+      required: [state, spreadsheetId, values]
+
+    AppendRowsResponse:
+      type: object
+      properties:
+        spreadsheetId:  { type: string }
+        tableRange:     { type: string }
+        updatedRange:   { type: string }
+        updatedRows:    { type: integer }
+        updatedColumns: { type: integer }
+        updatedCells:   { type: integer }
+      required: [spreadsheetId, updatedRows, updatedColumns, updatedCells]
+
+    UpdateRowsRequest:
+      type: object
+      properties:
+        state:         { type: string }
+        spreadsheetId: { type: string }
+        range:         { type: string }
+        values:
+          type: array
+          items:
+            type: array
+            items: {}
+      required: [state, spreadsheetId, values]
+

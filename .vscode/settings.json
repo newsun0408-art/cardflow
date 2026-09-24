@@ -1,0 +1,7 @@
+﻿{
+  "typescript.tsdk": "cardflow-app/node_modules/typescript/lib",
+  "go.toolsManagement.autoUpdate": true,
+  "files.associations": {
+    "*.md": "markdown"
+  }
+}

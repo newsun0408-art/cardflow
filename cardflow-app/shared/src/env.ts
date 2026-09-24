@@ -1,0 +1,38 @@
+// Bảng môi trường của Cardflow app — NGUỒN CHÂN LÝ DUY NHẤT của endpoint.
+//
+// Kit không biết URL nào; file này là chỗ dự án khai. Đổi môi trường bằng ĐÚNG
+// một biến `APP_ENV`, để không bao giờ có chuyện gateway trỏ beta còn SSO trỏ
+// prod. Mặc định `uat` để không vô tình chạy vào prod.
+//
+// Endpoint là DNS công khai, không phải secret, nên nằm trong code và được
+// review cùng MR. Chỉ `OIDC_CLIENT_SECRET` mới đi qua env/CI.
+import { defineEnvironments } from 'fe-kit/config';
+
+export const env = defineEnvironments(
+  {
+    uat: {
+      gateway: 'http://localhost:8080',
+      ssoIssuer: 'http://localhost:8080',
+      webOrigin: 'http://localhost:3000',
+    },
+    beta: {
+      gateway: 'http://localhost:8080',
+      ssoIssuer: 'http://localhost:8080',
+      webOrigin: 'http://localhost:3000',
+    },
+    prod: {
+      gateway: 'http://localhost:8080',
+      ssoIssuer: 'http://localhost:8080',
+      webOrigin: 'http://localhost:3000',
+    },
+  },
+  {
+    default: 'uat',
+    overrides: {
+      gateway: 'API_GATEWAY_URI',
+      ssoIssuer: 'SSO_ISSUER_URI',
+    },
+  },
+);
+
+export const OIDC_CLIENT_ID = 'cardflow-app-web';

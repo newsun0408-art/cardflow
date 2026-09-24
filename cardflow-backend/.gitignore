@@ -1,0 +1,54 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/server
+/migrate
+
+# Test binary
+*.test
+
+# Coverage
+*.out
+coverage.html
+
+# Go workspace (machine-local, never commit)
+go.work
+go.work.sum
+
+# Vendor (commit if used, otherwise ignore)
+# vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Runtime config — production sống ở config repo riêng, local values KHÔNG commit.
+# Chỉ commit example.* templates và .gitkeep.
+**/application-config/**
+!**/application-config/example.*
+!**/application-config/.gitkeep
+
+# Secrets local — KHÔNG commit. Token Jira để trong .jira.env (~/.jira.env hoặc ./.jira.env).
+.jira.env
+.env
+.env.*
+*.pem
+id_rsa
+firebase-secret.json
+
+# .claude: ignore hết, TRỪ toàn bộ .claude/skills/ (skill đi theo repo, cả team dùng).
+# Track MỌI skill dưới skills/ → thêm/đổi tên skill KHÔNG cần sửa .gitignore (tránh skill mới bị ignore sau sync).
+.claude/*
+!.claude/skills/

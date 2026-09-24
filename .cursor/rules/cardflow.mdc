@@ -1,0 +1,18 @@
+﻿---
+description: Cardflow Architecture & AI Guidelines
+globs: *
+alwaysApply: true
+---
+
+# Cardflow Project Guidelines
+
+You are working in the root `cardflow` repository containing:
+1. `cardflow-app/`: Next.js 16 Web & Expo Mobile (`fe-kit`).
+2. `cardflow-backend/`: Go microservice (`go-kit`, Clean Architecture, Echo, fx).
+3. `cardflow-docs/`: System documentation and API contracts.
+
+## Rules:
+- Shared memory is accessible via `tencent-memory` MCP configured in `.mcp.json`.
+- Backend endpoints follow `/cardflow-backend/v1/<feature>/actions/<action>`.
+- Frontend communicates with backend via `shared/src/api.ts` using port 8080.
+- All code must pass `pnpm type-check` (in cardflow-app) and `go build ./...` (in cardflow-backend).

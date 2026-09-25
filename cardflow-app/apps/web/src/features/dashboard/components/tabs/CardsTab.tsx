@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   AppstoreOutlined,
   TableOutlined,
@@ -8,6 +9,10 @@ import {
   StarOutlined,
   CreditCardOutlined,
   DeleteOutlined,
+  CheckOutlined,
+  CheckSquareOutlined,
+  CloseOutlined,
+  FileExcelOutlined,
 } from '@ant-design/icons';
 import type { CardDataModel, CardsViewMode } from '../../types';
 import type { CardTheme } from '@/app/_components/PersonalCard3D';
@@ -24,7 +29,7 @@ interface CardsTabProps {
   onDeleteCard: (id: string) => void;
   getCardMiniGradient: (theme: CardTheme) => string;
   isBalanceHidden: boolean;
-  onSaveToGoogleSheet?: () => void;
+  onSaveToGoogleSheet?: (selectedCards?: CardDataModel[]) => void;
   isSyncingToSheet?: boolean;
   lastSheetUrl?: string | null;
   isGoogleDriveConnected?: boolean;
@@ -49,6 +54,42 @@ export function CardsTab({
   isGoogleDriveConnected,
   onConnectGoogleDrive,
 }: CardsTabProps) {
+  // State quản lý việc chọn thẻ để lưu vào Google Sheet
+  const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
+  const [isCardSelectModalOpen, setIsCardSelectModalOpen] = useState(false);
+
+  // Toggle tick / bỏ tick 1 thẻ
+  const toggleCardSelection = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedCardIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  // Chọn tất cả hoặc bỏ chọn tất cả
+  const handleSelectAllCards = () => {
+    if (selectedCardIds.length === cards.length) {
+      setSelectedCardIds([]);
+    } else {
+      setSelectedCardIds(cards.map((c) => c.id));
+    }
+  };
+
+  // Thực hiện lưu thẻ đã tick vào Google Sheet
+  const handleTriggerSave = (cardsToSave?: CardDataModel[]) => {
+    const target = cardsToSave || (selectedCardIds.length > 0 ? cards.filter((c) => selectedCardIds.includes(c.id)) : []);
+    if (target.length === 0) {
+      // Nếu chưa tick thẻ nào, mở modal chọn thẻ trực quan
+      setIsCardSelectModalOpen(true);
+      return;
+    }
+    if (!isGoogleDriveConnected && onConnectGoogleDrive) {
+      onConnectGoogleDrive();
+    } else if (onSaveToGoogleSheet) {
+      onSaveToGoogleSheet(target);
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
@@ -141,17 +182,45 @@ export function CardsTab({
             </button>
           </div>
 
+          {/* Nút Chọn Thẻ cần lưu */}
+          <button
+            onClick={() => setIsCardSelectModalOpen(true)}
+            title="Chọn các thẻ bạn muốn lưu vào Google Sheet"
+            style={{
+              padding: '10px 16px',
+              borderRadius: '12px',
+              background: selectedCardIds.length > 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.06)',
+              border: selectedCardIds.length > 0 ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255, 255, 255, 0.12)',
+              color: selectedCardIds.length > 0 ? '#34d399' : '#e2e8f0',
+              fontWeight: 700,
+              fontSize: '13px',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s',
+              boxShadow: selectedCardIds.length > 0 ? '0 0 15px rgba(16, 185, 129, 0.25)' : 'none',
+            }}
+          >
+            <CheckSquareOutlined style={{ fontSize: '15px' }} />
+            <span>
+              {selectedCardIds.length > 0
+                ? `Đã chọn (${selectedCardIds.length}/${cards.length})`
+                : 'Chọn thẻ'}
+            </span>
+          </button>
+
           {/* Nút Lưu thông tin thẻ vào Google Sheet */}
           <button
-            onClick={() => {
-              if (!isGoogleDriveConnected && onConnectGoogleDrive) {
-                onConnectGoogleDrive();
-              } else if (onSaveToGoogleSheet) {
-                onSaveToGoogleSheet();
-              }
-            }}
+            onClick={() => handleTriggerSave()}
             disabled={isSyncingToSheet}
-            title={isGoogleDriveConnected ? "Lưu toàn bộ danh sách thẻ vào Google Sheet trong thư mục CardFlow" : "Kết nối Google Drive & Sheets để lưu danh sách thẻ"}
+            title={
+              selectedCardIds.length > 0
+                ? `Lưu ${selectedCardIds.length} thẻ đã tick vào Google Sheet`
+                : isGoogleDriveConnected
+                ? 'Lưu thẻ vào Google Sheet trong thư mục CardFlow'
+                : 'Kết nối Google Drive & Sheets để lưu danh sách thẻ'
+            }
             style={{
               padding: '10px 18px',
               borderRadius: '12px',
@@ -170,7 +239,13 @@ export function CardsTab({
               transition: 'all 0.2s',
             }}
           >
-            <span>{isSyncingToSheet ? '⏳ Đang lưu...' : '📊 Lưu vào Google Sheet'}</span>
+            <span>
+              {isSyncingToSheet
+                ? '⏳ Đang lưu...'
+                : selectedCardIds.length > 0
+                ? `📊 Lưu ${selectedCardIds.length} thẻ vào Google Sheet`
+                : '📊 Lưu vào Google Sheet'}
+            </span>
             {isGoogleDriveConnected && (
               <span
                 style={{
@@ -231,21 +306,109 @@ export function CardsTab({
         </div>
       </div>
 
+      {/* Banner thông báo khi đang chọn thẻ */}
+      {selectedCardIds.length > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'linear-gradient(90deg, rgba(16, 185, 129, 0.15) 0%, rgba(6, 78, 59, 0.25) 100%)',
+            border: '1px solid rgba(16, 185, 129, 0.4)',
+            borderRadius: '14px',
+            padding: '12px 20px',
+            color: '#f8fafc',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+            flexWrap: 'wrap',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '26px',
+                height: '26px',
+                borderRadius: '8px',
+                background: '#10b981',
+                color: '#ffffff',
+                fontSize: '13px',
+                fontWeight: 800,
+                boxShadow: '0 0 10px rgba(16, 185, 129, 0.5)',
+              }}
+            >
+              {selectedCardIds.length}
+            </span>
+            <span style={{ fontSize: '14px', fontWeight: 600 }}>
+              Đang chọn <strong style={{ color: '#34d399' }}>{selectedCardIds.length}</strong> / {cards.length} thẻ. Bạn tick vào thẻ nào thì hệ thống sẽ chỉ lưu thẻ đó vào Google Sheet.
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              onClick={handleSelectAllCards}
+              style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                color: '#cbd5e1',
+                borderRadius: '8px',
+                padding: '6px 14px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              {selectedCardIds.length === cards.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả thẻ'}
+            </button>
+
+            <button
+              onClick={() => handleTriggerSave()}
+              disabled={isSyncingToSheet}
+              style={{
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                border: 'none',
+                color: '#ffffff',
+                borderRadius: '8px',
+                padding: '6px 16px',
+                fontSize: '12px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 0 12px rgba(16, 185, 129, 0.4)',
+              }}
+            >
+              Lưu {selectedCardIds.length} thẻ ngay ↗
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* DẠNG 1: LƯỚI (GRID VIEW) */}
       {cardsViewMode === 'grid' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
           {cards.map((card) => {
             const isSelected = card.id === activeCardId;
+            const isCardChecked = selectedCardIds.includes(card.id);
             return (
               <div
                 key={card.id}
                 onClick={() => onSelectCard(card.id, true)}
                 style={{
                   background: 'rgba(15, 23, 42, 0.75)',
-                  border: isSelected ? '2px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.1)',
+                  border: isCardChecked
+                    ? '2px solid #10b981'
+                    : isSelected
+                    ? '2px solid #38bdf8'
+                    : '1px solid rgba(255, 255, 255, 0.1)',
                   borderRadius: '20px',
                   padding: '24px',
-                  boxShadow: isSelected ? '0 0 25px rgba(56, 189, 248, 0.25)' : '0 10px 30px rgba(0,0,0,0.3)',
+                  paddingTop: '28px',
+                  boxShadow: isCardChecked
+                    ? '0 0 25px rgba(16, 185, 129, 0.3)'
+                    : isSelected
+                    ? '0 0 25px rgba(56, 189, 248, 0.25)'
+                    : '0 10px 30px rgba(0,0,0,0.3)',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
@@ -255,6 +418,31 @@ export function CardsTab({
                 }}
                 className="my-card-grid-item"
               >
+                {/* Checkbox chọn thẻ để lưu Google Sheet */}
+                <div
+                  onClick={(e) => toggleCardSelection(card.id, e)}
+                  title={isCardChecked ? 'Bỏ chọn thẻ này' : 'Tick để chọn lưu thẻ này vào Google Sheet'}
+                  style={{
+                    position: 'absolute',
+                    top: '16px',
+                    left: '16px',
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '7px',
+                    border: isCardChecked ? '2px solid #10b981' : '2px solid rgba(255, 255, 255, 0.35)',
+                    background: isCardChecked ? '#10b981' : 'rgba(15, 23, 42, 0.85)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    zIndex: 10,
+                    transition: 'all 0.15s ease',
+                    boxShadow: isCardChecked ? '0 0 10px rgba(16, 185, 129, 0.5)' : 'none',
+                  }}
+                >
+                  {isCardChecked && <CheckOutlined style={{ color: '#ffffff', fontSize: '12px', fontWeight: 900 }} />}
+                </div>
+
                 {card.isDefault && (
                   <span style={{ position: 'absolute', top: '16px', right: '16px', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 700 }}>
                     <StarOutlined /> THẺ MẶC ĐỊNH
@@ -372,6 +560,25 @@ export function CardsTab({
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '780px' }}>
               <thead>
                 <tr style={{ background: 'rgba(30, 41, 59, 0.65)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <th style={{ width: '48px', padding: '14px 16px', textAlign: 'center' }}>
+                    <div
+                      onClick={handleSelectAllCards}
+                      title={selectedCardIds.length === cards.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả thẻ'}
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '5px',
+                        border: selectedCardIds.length > 0 ? '2px solid #10b981' : '2px solid rgba(255, 255, 255, 0.35)',
+                        background: selectedCardIds.length > 0 ? '#10b981' : 'transparent',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {selectedCardIds.length > 0 && <CheckOutlined style={{ color: '#ffffff', fontSize: '11px', fontWeight: 900 }} />}
+                    </div>
+                  </th>
                   <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Thẻ & Ngân hàng</th>
                   <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Số thẻ & Loại</th>
                   <th style={{ padding: '14px 20px', fontSize: '12px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Chủ thẻ</th>
@@ -384,6 +591,7 @@ export function CardsTab({
               <tbody>
                 {cards.map((card) => {
                   const isSelected = card.id === activeCardId;
+                  const isCardChecked = selectedCardIds.includes(card.id);
                   return (
                     <tr
                       key={card.id}
@@ -391,16 +599,40 @@ export function CardsTab({
                       style={{
                         borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
                         cursor: 'pointer',
-                        background: isSelected ? 'rgba(56, 189, 248, 0.08)' : 'transparent',
+                        background: isCardChecked
+                          ? 'rgba(16, 185, 129, 0.1)'
+                          : isSelected
+                          ? 'rgba(56, 189, 248, 0.08)'
+                          : 'transparent',
                         transition: 'background 0.15s ease',
                       }}
                       onMouseEnter={(e) => {
-                        if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                        if (!isSelected && !isCardChecked) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
                       }}
                       onMouseLeave={(e) => {
-                        if (!isSelected) e.currentTarget.style.background = 'transparent';
+                        if (!isSelected && !isCardChecked) e.currentTarget.style.background = 'transparent';
                       }}
                     >
+                      {/* Checkbox */}
+                      <td style={{ width: '48px', padding: '16px', textAlign: 'center' }} onClick={(e) => toggleCardSelection(card.id, e)}>
+                        <div
+                          title={isCardChecked ? 'Bỏ chọn thẻ này' : 'Tick để chọn lưu thẻ này vào Google Sheet'}
+                          style={{
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '5px',
+                            border: isCardChecked ? '2px solid #10b981' : '2px solid rgba(255, 255, 255, 0.35)',
+                            background: isCardChecked ? '#10b981' : 'transparent',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {isCardChecked && <CheckOutlined style={{ color: '#ffffff', fontSize: '11px', fontWeight: 900 }} />}
+                        </div>
+                      </td>
+
                       {/* Thẻ & Ngân hàng */}
                       <td style={{ padding: '16px 20px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -552,16 +784,25 @@ export function CardsTab({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {cards.map((card) => {
             const isSelected = card.id === activeCardId;
+            const isCardChecked = selectedCardIds.includes(card.id);
             return (
               <div
                 key={card.id}
                 onClick={() => onSelectCard(card.id, true)}
                 style={{
                   background: 'rgba(15, 23, 42, 0.75)',
-                  border: isSelected ? '2px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.1)',
+                  border: isCardChecked
+                    ? '2px solid #10b981'
+                    : isSelected
+                    ? '2px solid #38bdf8'
+                    : '1px solid rgba(255, 255, 255, 0.1)',
                   borderRadius: '16px',
                   padding: '16px 20px',
-                  boxShadow: isSelected ? '0 0 20px rgba(56, 189, 248, 0.2)' : '0 4px 20px rgba(0, 0, 0, 0.25)',
+                  boxShadow: isCardChecked
+                    ? '0 0 20px rgba(16, 185, 129, 0.25)'
+                    : isSelected
+                    ? '0 0 20px rgba(56, 189, 248, 0.2)'
+                    : '0 4px 20px rgba(0, 0, 0, 0.25)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -571,7 +812,29 @@ export function CardsTab({
                   flexWrap: 'wrap',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', minWidth: '260px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: '260px' }}>
+                  {/* Checkbox chọn thẻ để lưu Google Sheet */}
+                  <div
+                    onClick={(e) => toggleCardSelection(card.id, e)}
+                    title={isCardChecked ? 'Bỏ chọn thẻ này' : 'Tick để chọn lưu thẻ này vào Google Sheet'}
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '7px',
+                      border: isCardChecked ? '2px solid #10b981' : '2px solid rgba(255, 255, 255, 0.35)',
+                      background: isCardChecked ? '#10b981' : 'rgba(15, 23, 42, 0.85)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                      transition: 'all 0.15s ease',
+                      boxShadow: isCardChecked ? '0 0 10px rgba(16, 185, 129, 0.5)' : 'none',
+                    }}
+                  >
+                    {isCardChecked && <CheckOutlined style={{ color: '#ffffff', fontSize: '13px', fontWeight: 900 }} />}
+                  </div>
+
                   <div
                     style={{
                       width: '46px',
@@ -706,6 +969,287 @@ export function CardsTab({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* MODAL: CHỌN THẺ CẦN LƯU VÀO GOOGLE SHEET */}
+      {isCardSelectModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '20px',
+          }}
+          onClick={() => setIsCardSelectModalOpen(false)}
+        >
+          <div
+            style={{
+              background: '#0f172a',
+              border: '1px solid rgba(16, 185, 129, 0.35)',
+              borderRadius: '24px',
+              width: '100%',
+              maxWidth: '560px',
+              maxHeight: '90vh',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 30px rgba(16, 185, 129, 0.15)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: '20px 24px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: 'rgba(30, 41, 59, 0.4)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '12px',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ffffff',
+                    fontSize: '20px',
+                    boxShadow: '0 0 15px rgba(16, 185, 129, 0.4)',
+                  }}
+                >
+                  <FileExcelOutlined />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#ffffff' }}>
+                    Chọn Thẻ Cần Lưu Vào Google Sheet
+                  </h3>
+                  <div style={{ fontSize: '12px', color: '#94a3b8' }}>
+                    Tick chọn thẻ bạn muốn lưu (chọn 1 lưu 1, chọn 2 lưu 2...)
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCardSelectModalOpen(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '10px',
+                  color: '#94a3b8',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <CloseOutlined />
+              </button>
+            </div>
+
+            {/* Select All Controls */}
+            <div
+              style={{
+                padding: '12px 24px',
+                background: 'rgba(15, 23, 42, 0.6)',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ fontSize: '13px', color: '#cbd5e1' }}>
+                Đã chọn: <strong style={{ color: '#34d399', fontSize: '15px' }}>{selectedCardIds.length}</strong> / {cards.length} thẻ
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => setSelectedCardIds(cards.map((c) => c.id))}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: '8px',
+                    background: 'rgba(56, 189, 248, 0.15)',
+                    border: '1px solid rgba(56, 189, 248, 0.3)',
+                    color: '#38bdf8',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Chọn tất cả
+                </button>
+                <button
+                  onClick={() => setSelectedCardIds([])}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: '8px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    color: '#94a3b8',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Bỏ chọn
+                </button>
+              </div>
+            </div>
+
+            {/* Card List in Modal */}
+            <div style={{ padding: '16px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {cards.map((card) => {
+                const isChecked = selectedCardIds.includes(card.id);
+                return (
+                  <div
+                    key={card.id}
+                    onClick={() => toggleCardSelection(card.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '14px 16px',
+                      borderRadius: '14px',
+                      background: isChecked ? 'rgba(16, 185, 129, 0.12)' : 'rgba(30, 41, 59, 0.5)',
+                      border: isChecked ? '2px solid #10b981' : '1px solid rgba(255, 255, 255, 0.08)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                      <div
+                        style={{
+                          width: '22px',
+                          height: '22px',
+                          borderRadius: '6px',
+                          border: isChecked ? '2px solid #10b981' : '2px solid rgba(255, 255, 255, 0.3)',
+                          background: isChecked ? '#10b981' : 'transparent',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {isChecked && <CheckOutlined style={{ color: '#ffffff', fontSize: '12px' }} />}
+                      </div>
+
+                      <div
+                        style={{
+                          width: '42px',
+                          height: '28px',
+                          borderRadius: '6px',
+                          background: getCardMiniGradient(card.theme),
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#ffffff',
+                          fontSize: '14px',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <CreditCardOutlined />
+                      </div>
+
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontWeight: 700, color: '#ffffff', fontSize: '14px' }}>{card.nickname}</span>
+                          {card.isDefault && (
+                            <span style={{ background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', fontSize: '10px', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                              Mặc định
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#94a3b8' }}>
+                          {card.bankName} • <span style={{ fontFamily: 'monospace' }}>•••• {card.lastFourDigits}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#ffffff' }}>
+                        {card.dailyLimit.toLocaleString('vi-VN')} ₫
+                      </div>
+                      <div style={{ fontSize: '11px', color: card.isLocked ? '#fca5a5' : '#4ade80' }}>
+                        {card.isLocked ? '🔒 Đã khóa' : '⚡ Hoạt động'}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                padding: '16px 24px',
+                borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: '12px',
+                background: 'rgba(30, 41, 59, 0.4)',
+              }}
+            >
+              <button
+                onClick={() => setIsCardSelectModalOpen(false)}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '12px',
+                  background: 'transparent',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  color: '#cbd5e1',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Hủy
+              </button>
+
+              <button
+                onClick={() => {
+                  const chosen = cards.filter((c) => selectedCardIds.includes(c.id));
+                  if (chosen.length > 0) {
+                    setIsCardSelectModalOpen(false);
+                    handleTriggerSave(chosen);
+                  }
+                }}
+                disabled={selectedCardIds.length === 0 || isSyncingToSheet}
+                style={{
+                  padding: '10px 22px',
+                  borderRadius: '12px',
+                  background: selectedCardIds.length > 0
+                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                    : 'rgba(255, 255, 255, 0.1)',
+                  border: 'none',
+                  color: selectedCardIds.length > 0 ? '#ffffff' : '#64748b',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: selectedCardIds.length > 0 && !isSyncingToSheet ? 'pointer' : 'not-allowed',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: selectedCardIds.length > 0 ? '0 0 20px rgba(16, 185, 129, 0.4)' : 'none',
+                }}
+              >
+                <span>
+                  {isSyncingToSheet
+                    ? '⏳ Đang lưu...'
+                    : `📊 Lưu ${selectedCardIds.length} thẻ đã chọn vào Google Sheet`}
+                </span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

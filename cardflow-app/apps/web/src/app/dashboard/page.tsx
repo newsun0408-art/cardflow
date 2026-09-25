@@ -200,7 +200,7 @@ export default function FullscreenDashboard() {
               onDeleteCard={handleDeleteCard}
               getCardMiniGradient={getCardMiniGradient}
               isBalanceHidden={isBalanceHidden}
-              onSaveToGoogleSheet={() => handleSaveCardsToGoogleSheet()}
+              onSaveToGoogleSheet={(selectedCards) => handleSaveCardsToGoogleSheet(selectedCards)}
               isSyncingToSheet={isSyncingToSheet}
               lastSheetUrl={lastSheetUrl}
               isGoogleDriveConnected={isGoogleDriveConnected}

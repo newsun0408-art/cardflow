@@ -15,6 +15,7 @@ type SpreadsheetResponse struct {
 	FolderName     string `json:"folderName,omitempty"`
 }
 
+
 // AppendRowsRequest is the payload for appending rows of data into a Google Sheet.
 type AppendRowsRequest struct {
 	State         string          `json:"state"`
@@ -48,39 +49,36 @@ type UpdateRowsRequest struct {
 	Values        [][]interface{} `json:"values"`
 }
 
-// ImportSheetRequest is the payload for parsing and importing transactions from a Google Sheet.
-type ImportSheetRequest struct {
-	State         string `json:"state"`
-	SpreadsheetID string `json:"spreadsheetId"` // Supports raw ID or full Google Sheet URL
-	Range         string `json:"range,omitempty"`
+// CardItemDTO represents card details for Google Sheet export.
+type CardItemDTO struct {
+	ID                string `json:"id"`
+	Nickname          string `json:"nickname"`
+	BankName          string `json:"bankName"`
+	CardType          string `json:"cardType"`
+	CardCategory      string `json:"cardCategory"`
+	CardNetwork       string `json:"cardNetwork"`
+	CardNumber        string `json:"cardNumber"`
+	HolderName        string `json:"holderName"`
+	ExpiryOrIssueDate string `json:"expiryOrIssueDate"`
+	CVV               string `json:"cvv,omitempty"`
+	Balance           int64  `json:"balance"`
+	DailyLimit        int64  `json:"dailyLimit"`
+	Status            string `json:"status"`
 }
 
-// ParsedTransactionItem represents a single transaction parsed from Google Sheet rows.
-type ParsedTransactionItem struct {
-	ID            string  `json:"id"`
-	ReferenceID   string  `json:"referenceId"`
-	Date          string  `json:"date"`
-	Time          string  `json:"time"`
-	CardLast4     string  `json:"cardLast4"`
-	Merchant      string  `json:"merchant"`
-	Category      string  `json:"category"`
-	CategoryLabel string  `json:"categoryLabel"`
-	Amount        float64 `json:"amount"`
-	Type          string  `json:"type"` // "expense" | "income"
-	Status        string  `json:"status"`
-	IsValid       bool    `json:"isValid"`
-	ErrorMessage  string  `json:"errorMessage,omitempty"`
+// SaveCardsRequest is the payload for saving card records into a Google Sheet.
+type SaveCardsRequest struct {
+	State string        `json:"state"`
+	Cards []CardItemDTO `json:"cards"`
 }
 
-// ImportSheetResponse represents the parsed sheet data, transaction items, and summary statistics.
-type ImportSheetResponse struct {
-	SpreadsheetID string                  `json:"spreadsheetId"`
-	Title         string                  `json:"title"`
-	TotalRows     int                     `json:"totalRows"`
-	ValidCount    int                     `json:"validCount"`
-	ErrorCount    int                     `json:"errorCount"`
-	TotalExpense  float64                 `json:"totalExpense"`
-	TotalIncome   float64                 `json:"totalIncome"`
-	NetChange     float64                 `json:"netChange"`
-	Transactions  []ParsedTransactionItem `json:"transactions"`
+// SaveCardsResponse holds the outcome of saving cards into Google Sheet.
+type SaveCardsResponse struct {
+	SpreadsheetID  string `json:"spreadsheetId"`
+	SpreadsheetURL string `json:"spreadsheetUrl"`
+	FolderID       string `json:"folderId"`
+	FolderName     string `json:"folderName"`
+	SavedCards     int    `json:"savedCards"`
+	Message        string `json:"message"`
 }
+

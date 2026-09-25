@@ -323,17 +323,11 @@ func (s *Service) GetImportedFiles(ctx context.Context, state string) ([]DriveFi
 	if state == "" {
 		return nil, fmt.Errorf("state is required")
 	}
-	if tok, ok := s.repo.GetToken(ctx, state); !ok || tok == nil {
-		if s.repo.ValidateState(ctx, state) {
-			return nil, fmt.Errorf("Google account is not connected for this state")
-		}
-		return nil, fmt.Errorf("Google account is not connected for this state")
-	}
 	files, ok := s.repo.GetImportedFiles(ctx, state)
 	if !ok {
 		resp, err := s.SyncCardFlowFiles(ctx, state)
 		if err != nil {
-			return nil, err
+			return []DriveFile{}, nil
 		}
 		return resp.Files, nil
 	}

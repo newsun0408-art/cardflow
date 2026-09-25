@@ -14,7 +14,7 @@
     "@cardflow-app/shared": "workspace:*",
     "antd": "^6.6.3",
     "fe-kit": "github:bangdinh/fe-kit#main",
-    "googleapis": "^181.0.0",
+    "firebase": "^12.19.0",
     "next": "^16.3.5",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"

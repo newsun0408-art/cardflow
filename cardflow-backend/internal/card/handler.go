@@ -1,116 +1,69 @@
-﻿package card
+package card
 
 import (
 	"net/http"
 
-	"github.com/bangdinh/go-kit/response"
 	"github.com/labstack/echo/v4"
 )
 
-// Handler exposes HTTP routes for Card operations.
 type Handler struct {
 	svc *Service
 }
 
-// NewHandler creates a new Card HTTP handler.
 func NewHandler(svc *Service) *Handler {
 	return &Handler{svc: svc}
 }
 
-// RegisterRoutes mounts card routes on the Echo router following Kong / API standard.
-func (h *Handler) RegisterRoutes(e *echo.Echo, mw ...echo.MiddlewareFunc) {
-	g := e.Group("/cardflow-backend/v1/card", mw...)
+func (h *Handler) RegisterRoutes(e *echo.Echo) {
+	g := e.Group("/api/v1/cards")
 
-	g.GET("/actions/list", h.List)
-	g.GET("/actions/view/:cardId", h.GetByID)
-	g.POST("/actions/create", h.Create)
-	g.POST("/actions/verify-pin", h.VerifyPin)
-	g.POST("/actions/change-pin", h.ChangePin)
-	g.POST("/actions/set-limit", h.SetLimit)
-	g.POST("/actions/toggle-lock", h.ToggleLock)
+	g.GET("", h.listCards)
+	g.POST("", h.createCard)
+	g.PATCH("/:id/status", h.updateCardStatus)
 }
 
-// List returns all user cards.
-func (h *Handler) List(c echo.Context) error {
-	cards, err := h.svc.List(c.Request().Context())
+func (h *Handler) listCards(c echo.Context) error {
+	userID := c.Request().Header.Get("X-User-Id")
+	if userID == "" {
+		userID = "usr-001"
+	}
+	cards, err := h.svc.List(c.Request().Context(), userID)
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, response.NewData(cards))
+	return c.JSON(http.StatusOK, map[string]any{
+		"data": cards,
+	})
 }
 
-// GetByID returns card details.
-func (h *Handler) GetByID(c echo.Context) error {
-	id := c.Param("cardId")
-	card, err := h.svc.GetByID(c.Request().Context(), id)
-	if err != nil {
-		return err
+func (h *Handler) createCard(c echo.Context) error {
+	userID := c.Request().Header.Get("X-User-Id")
+	if userID == "" {
+		userID = "usr-001"
 	}
-	return c.JSON(http.StatusOK, response.NewData(card))
-}
-
-// Create registers a new card.
-func (h *Handler) Create(c echo.Context) error {
 	var req CreateCardRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid payload"})
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
-	card, err := h.svc.Create(c.Request().Context(), req)
+	created, err := h.svc.Create(c.Request().Context(), userID, req)
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusCreated, response.NewData(card))
+	return c.JSON(http.StatusCreated, map[string]any{
+		"data": created,
+	})
 }
 
-// VerifyPin handles PIN verification to reveal sensitive CVV & card number.
-func (h *Handler) VerifyPin(c echo.Context) error {
-	var req VerifyPinRequest
+func (h *Handler) updateCardStatus(c echo.Context) error {
+	id := c.Param("id")
+	var req UpdateStatusRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid payload"})
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
-	res, err := h.svc.VerifyPin(c.Request().Context(), req)
-	if err != nil {
+	if err := h.svc.UpdateStatus(c.Request().Context(), id, req.Status); err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, response.NewData(res))
-}
-
-// ChangePin updates card PIN.
-func (h *Handler) ChangePin(c echo.Context) error {
-	var req ChangePinRequest
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid payload"})
-	}
-	if err := h.svc.ChangePin(c.Request().Context(), req); err != nil {
-		return err
-	}
-	return c.JSON(http.StatusOK, response.NewData(map[string]bool{"success": true}))
-}
-
-// SetLimit adjusts daily transaction limit.
-func (h *Handler) SetLimit(c echo.Context) error {
-	var req SetLimitRequest
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid payload"})
-	}
-	if err := h.svc.SetLimit(c.Request().Context(), req); err != nil {
-		return err
-	}
-	return c.JSON(http.StatusOK, response.NewData(map[string]bool{"success": true}))
-}
-
-// ToggleLock freezes or unfreezes card.
-func (h *Handler) ToggleLock(c echo.Context) error {
-	var req ToggleLockRequest
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid payload"})
-	}
-	isLocked, err := h.svc.ToggleLock(c.Request().Context(), req)
-	if err != nil {
-		return err
-	}
-	return c.JSON(http.StatusOK, response.NewData(map[string]interface{}{
-		"success":  true,
-		"isLocked": isLocked,
-	}))
+	return c.JSON(http.StatusOK, map[string]any{
+		"data": map[string]string{"id": id, "status": req.Status},
+	})
 }

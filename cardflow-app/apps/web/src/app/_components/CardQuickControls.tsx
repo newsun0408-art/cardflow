@@ -1,8 +1,7 @@
 'use client';
 
 import { 
-  LockOutlined, 
-  UnlockOutlined, 
+  DeleteOutlined, 
   EyeOutlined, 
   EyeInvisibleOutlined, 
   KeyOutlined, 
@@ -13,10 +12,11 @@ import type { CardTheme } from './PersonalCard3D';
 
 interface CardQuickControlsProps {
   currentTheme: CardTheme;
-  isLocked: boolean;
+  isLocked?: boolean;
   showSensitiveData: boolean;
   countdownSeconds?: number;
-  onToggleLock: () => void;
+  onToggleLock?: () => void;
+  onDeleteCard?: () => void;
   onToggleSensitiveData: () => void;
   onOpenChangePin: () => void;
   onOpenSetLimit: () => void;
@@ -25,10 +25,9 @@ interface CardQuickControlsProps {
 
 export function CardQuickControls({
   currentTheme,
-  isLocked,
   showSensitiveData,
   countdownSeconds,
-  onToggleLock,
+  onDeleteCard,
   onToggleSensitiveData,
   onOpenChangePin,
   onOpenSetLimit,
@@ -47,35 +46,39 @@ export function CardQuickControls({
     >
       {/* Primary Control Buttons */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-        {/* Lock/Unlock Toggle */}
+        {/* Delete Card Button */}
         <button
           type="button"
-          onClick={onToggleLock}
+          onClick={onDeleteCard}
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '8px',
-            background: isLocked
-              ? 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)'
-              : 'rgba(30, 41, 59, 0.8)',
-            color: '#ffffff',
-            border: isLocked
-              ? '1px solid rgba(239, 68, 68, 0.5)'
-              : '1px solid rgba(255, 255, 255, 0.12)',
+            background: 'rgba(239, 68, 68, 0.15)',
+            color: '#fca5a5',
+            border: '1px solid rgba(239, 68, 68, 0.35)',
             borderRadius: '14px',
             padding: '12px 14px',
             fontSize: '13px',
             fontWeight: 700,
             cursor: 'pointer',
-            boxShadow: isLocked ? '0 4px 14px rgba(239, 68, 68, 0.3)' : 'none',
             backdropFilter: 'blur(8px)',
             transition: 'all 0.2s ease',
           }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)';
+            e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.6)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+            e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.35)';
+          }}
         >
-          {isLocked ? <UnlockOutlined /> : <LockOutlined style={{ color: '#ef4444' }} />}
-          <span>{isLocked ? 'Mở Khóa Thẻ' : 'Khóa Thẻ Tạm Thời'}</span>
+          <DeleteOutlined style={{ color: '#ef4444' }} />
+          <span>Xóa Thẻ Khỏi Ví</span>
         </button>
+
 
         {/* Show/Hide Sensitive Info */}
         <button

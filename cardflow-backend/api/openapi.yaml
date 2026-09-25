@@ -20,7 +20,7 @@ security:
 
 paths:
   /sample/actions/create:
-    post: 
+    post:
       operationId: createSample
       summary: Create a sample
       requestBody:

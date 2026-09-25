@@ -3,7 +3,6 @@ package sheet
 import (
 	"net/http"
 
-	"github.com/bangdinh/go-kit/response"
 	"github.com/labstack/echo/v4"
 )
 
@@ -24,8 +23,23 @@ func (h *Handler) RegisterRoutes(e *echo.Echo, mw ...echo.MiddlewareFunc) {
 	g.GET("/actions/read", h.ReadRows)
 	g.POST("/actions/append", h.AppendRows)
 	g.PUT("/actions/update", h.UpdateRows)
-	g.POST("/actions/import", h.ImportSheet)
-	g.GET("/actions/import", h.ImportSheet)
+	g.POST("/actions/save-cards", h.SaveCards)
+	g.POST("/actions/sync-cards", h.SaveCards)
+}
+
+// SaveCards handles creating or updating a Google Sheet containing the user's cards.
+func (h *Handler) SaveCards(c echo.Context) error {
+	var req SaveCardsRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{"error": err.Error()})
+	}
+	res, err := h.svc.SaveCards(c.Request().Context(), req.State, req.Cards)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"data": res,
+	})
 }
 
 // CreateSpreadsheet handles creating a new Google Sheet.
@@ -38,7 +52,7 @@ func (h *Handler) CreateSpreadsheet(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
-	return c.JSON(http.StatusOK, response.NewData(res))
+	return c.JSON(http.StatusOK, res)
 }
 
 // ReadRows handles reading data from a spreadsheet range.
@@ -51,7 +65,7 @@ func (h *Handler) ReadRows(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
-	return c.JSON(http.StatusOK, response.NewData(res))
+	return c.JSON(http.StatusOK, res)
 }
 
 // AppendRows handles appending rows of data into a spreadsheet.
@@ -64,7 +78,7 @@ func (h *Handler) AppendRows(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
-	return c.JSON(http.StatusOK, response.NewData(res))
+	return c.JSON(http.StatusOK, res)
 }
 
 // UpdateRows handles overwriting a specific range of cells in a spreadsheet.
@@ -77,30 +91,5 @@ func (h *Handler) UpdateRows(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
-	return c.JSON(http.StatusOK, response.NewData(res))
-}
-
-// ImportSheet handles reading and parsing transactions from a Google Sheet.
-func (h *Handler) ImportSheet(c echo.Context) error {
-	var req ImportSheetRequest
-	if c.Request().Method == http.MethodPost {
-		if err := c.Bind(&req); err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
-		}
-	}
-	if req.State == "" {
-		req.State = c.QueryParam("state")
-	}
-	if req.SpreadsheetID == "" {
-		req.SpreadsheetID = c.QueryParam("spreadsheetId")
-	}
-	if req.Range == "" {
-		req.Range = c.QueryParam("range")
-	}
-
-	res, err := h.svc.ImportSheet(c.Request().Context(), req)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
-	}
-	return c.JSON(http.StatusOK, response.NewData(res))
+	return c.JSON(http.StatusOK, res)
 }

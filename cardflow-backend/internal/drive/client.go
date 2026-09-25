@@ -6,12 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
-	"github.com/joho/godotenv"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/drive/v3"
@@ -26,51 +23,19 @@ type Config struct {
 	Scopes       []string
 }
 
-func loadGoogleDriveEnv() {
-	if strings.TrimSpace(os.Getenv("GOOGLE_DRIVE_CLIENT_ID")) != "" && strings.TrimSpace(os.Getenv("GOOGLE_DRIVE_CLIENT_SECRET")) != "" {
-		return
-	}
-
-	seen := map[string]struct{}{}
-	addCandidate := func(dir string) {
-		dir = strings.TrimSpace(dir)
-		if dir == "" {
-			return
-		}
-		clean := filepath.Clean(dir)
-		if _, ok := seen[clean]; ok {
-			return
-		}
-		seen[clean] = struct{}{}
-
-		envPath := filepath.Join(clean, ".env")
-		if _, err := os.Stat(envPath); err == nil {
-			_ = godotenv.Load(envPath)
-		}
-	}
-
-	if dir := strings.TrimSpace(os.Getenv("APPLICATION_CONFIG_DIR")); dir != "" {
-		addCandidate(dir)
-	}
-	if wd, err := os.Getwd(); err == nil {
-		addCandidate(wd)
-		addCandidate(filepath.Join(wd, "application-config"))
-		addCandidate(filepath.Join(filepath.Dir(wd), "application-config"))
-	}
-	if _, file, _, ok := runtime.Caller(0); ok {
-		pkgDir := filepath.Dir(file)
-		addCandidate(pkgDir)
-		addCandidate(filepath.Join(pkgDir, "..", "..", "application-config"))
-		addCandidate(filepath.Join(pkgDir, "..", "application-config"))
-	}
-}
-
 func readConfig() Config {
-	loadGoogleDriveEnv()
+	clientID := strings.TrimSpace(os.Getenv("GOOGLE_DRIVE_CLIENT_ID"))
+	if clientID == "" {
+		clientID = strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_ID"))
+	}
+	clientSecret := strings.TrimSpace(os.Getenv("GOOGLE_DRIVE_CLIENT_SECRET"))
+	if clientSecret == "" {
+		clientSecret = strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_SECRET"))
+	}
 
 	cfg := Config{
-		ClientID:     strings.TrimSpace(os.Getenv("GOOGLE_DRIVE_CLIENT_ID")),
-		ClientSecret: strings.TrimSpace(os.Getenv("GOOGLE_DRIVE_CLIENT_SECRET")),
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
 		RedirectURL:  strings.TrimSpace(os.Getenv("GOOGLE_DRIVE_REDIRECT_URL")),
 		Scopes: []string{
 			"https://www.googleapis.com/auth/drive.file",

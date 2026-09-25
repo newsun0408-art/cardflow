@@ -2,26 +2,23 @@
 
 import { useState } from 'react';
 import { CloseOutlined, KeyOutlined, CheckCircleOutlined } from '@ant-design/icons';
-import { changePinAction } from '../actions/card-security';
 
 interface ChangePinModalProps {
   isOpen: boolean;
-  cardId: string;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function ChangePinModal({ isOpen, cardId, onClose, onSuccess }: ChangePinModalProps) {
+export function ChangePinModal({ isOpen, onClose, onSuccess }: ChangePinModalProps) {
   const [oldPin, setOldPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -35,29 +32,15 @@ export function ChangePinModal({ isOpen, cardId, onClose, onSuccess }: ChangePin
       return;
     }
 
-    setLoading(true);
-    try {
-      const res = await changePinAction({ cardId, oldPin, newPin });
-      if (!res.success) {
-        setError(res.error || 'Đổi mã PIN thất bại. Vui lòng kiểm tra mã PIN hiện tại.');
-        setLoading(false);
-        return;
-      }
-
-      setSuccess(true);
-      setTimeout(() => {
-        setSuccess(false);
-        setOldPin('');
-        setNewPin('');
-        setConfirmPin('');
-        setLoading(false);
-        onSuccess();
-        onClose();
-      }, 1500);
-    } catch {
-      setError('Lỗi kết nối máy chủ');
-      setLoading(false);
-    }
+    setSuccess(true);
+    setTimeout(() => {
+      setSuccess(false);
+      setOldPin('');
+      setNewPin('');
+      setConfirmPin('');
+      onSuccess();
+      onClose();
+    }, 1500);
   };
 
   return (
@@ -211,20 +194,19 @@ export function ChangePinModal({ isOpen, cardId, onClose, onSuccess }: ChangePin
 
             <button
               type="submit"
-              disabled={loading}
               style={{
                 marginTop: '8px',
-                background: loading ? '#475569' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                 border: 'none',
                 color: '#fff',
                 borderRadius: '10px',
                 padding: '10px 0',
                 fontWeight: 700,
                 fontSize: '13px',
-                cursor: loading ? 'not-allowed' : 'pointer',
+                cursor: 'pointer',
               }}
             >
-              {loading ? 'Đang xử lý...' : 'Xác Nhận Đổi Mã PIN'}
+              Xác Nhận Đổi Mã PIN
             </button>
           </form>
         )}

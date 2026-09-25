@@ -8,7 +8,7 @@ import {
   PlusOutlined,
   StarOutlined,
   CreditCardOutlined,
-  DeleteOutlined,
+  EditOutlined,
   CheckOutlined,
   CheckSquareOutlined,
   CloseOutlined,
@@ -26,7 +26,8 @@ interface CardsTabProps {
   onSelectCard: (id: string, openDetail?: boolean) => void;
   onSetDefaultCard: (id: string) => void;
   onToggleLock: (id: string) => void;
-  onDeleteCard: (id: string) => void;
+  onDeleteCard?: (id: string) => void;
+  onUpdateCard?: (id: string, updatedFields: Partial<CardDataModel>) => void;
   getCardMiniGradient: (theme: CardTheme) => string;
   isBalanceHidden: boolean;
   onSaveToGoogleSheet?: (selectedCards?: CardDataModel[]) => void;
@@ -45,7 +46,8 @@ export function CardsTab({
   onSelectCard,
   onSetDefaultCard,
   onToggleLock,
-  onDeleteCard,
+  onDeleteCard: _onDeleteCard,
+  onUpdateCard,
   getCardMiniGradient,
   isBalanceHidden,
   onSaveToGoogleSheet,
@@ -54,6 +56,62 @@ export function CardsTab({
   isGoogleDriveConnected,
   onConnectGoogleDrive,
 }: CardsTabProps) {
+  // State chỉnh sửa thẻ
+  const [editingCard, setEditingCard] = useState<CardDataModel | null>(null);
+  const [editForm, setEditForm] = useState<{
+    nickname: string;
+    holderName: string;
+    bankName: string;
+    dailyLimit: number;
+    theme: CardTheme;
+    onlinePayment: boolean;
+    internationalPayment: boolean;
+    atmWithdrawal: boolean;
+    notificationsEnabled: boolean;
+  }>({
+    nickname: '',
+    holderName: '',
+    bankName: '',
+    dailyLimit: 50000000,
+    theme: 'dark-cyber',
+    onlinePayment: true,
+    internationalPayment: true,
+    atmWithdrawal: true,
+    notificationsEnabled: true,
+  });
+
+  const handleOpenEditModal = (card: CardDataModel) => {
+    setEditingCard(card);
+    setEditForm({
+      nickname: card.nickname || '',
+      holderName: card.holderName || '',
+      bankName: card.bankName || '',
+      dailyLimit: card.dailyLimit || 50000000,
+      theme: card.theme || 'dark-cyber',
+      onlinePayment: card.onlinePayment ?? true,
+      internationalPayment: card.internationalPayment ?? true,
+      atmWithdrawal: card.atmWithdrawal ?? true,
+      notificationsEnabled: card.notificationsEnabled ?? true,
+    });
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingCard) return;
+    if (onUpdateCard) {
+      onUpdateCard(editingCard.id, {
+        nickname: editForm.nickname.trim() || editingCard.nickname,
+        holderName: editForm.holderName.trim().toUpperCase() || editingCard.holderName,
+        bankName: editForm.bankName.trim() || editingCard.bankName,
+        dailyLimit: Number(editForm.dailyLimit) || editingCard.dailyLimit,
+        theme: editForm.theme,
+        onlinePayment: editForm.onlinePayment,
+        internationalPayment: editForm.internationalPayment,
+        atmWithdrawal: editForm.atmWithdrawal,
+        notificationsEnabled: editForm.notificationsEnabled,
+      });
+    }
+    setEditingCard(null);
+  };
   // State quản lý việc chọn thẻ để lưu vào Google Sheet
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
   const [isCardSelectModalOpen, setIsCardSelectModalOpen] = useState(false);
@@ -516,14 +574,14 @@ export function CardsTab({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onDeleteCard(card.id);
+                      handleOpenEditModal(card);
                     }}
                     style={{
                       padding: '8px 14px',
                       borderRadius: '10px',
-                      background: 'rgba(239, 68, 68, 0.15)',
-                      border: '1px solid rgba(239, 68, 68, 0.35)',
-                      color: '#fca5a5',
+                      background: 'rgba(56, 189, 248, 0.15)',
+                      border: '1px solid rgba(56, 189, 248, 0.35)',
+                      color: '#38bdf8',
                       fontSize: '12px',
                       fontWeight: 700,
                       cursor: 'pointer',
@@ -532,11 +590,11 @@ export function CardsTab({
                       gap: '6px',
                       transition: 'all 0.2s',
                     }}
-                    onMouseOver={(e) => (e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)')}
-                    onMouseOut={(e) => (e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)')}
+                    onMouseOver={(e) => (e.currentTarget.style.background = 'rgba(56, 189, 248, 0.25)')}
+                    onMouseOut={(e) => (e.currentTarget.style.background = 'rgba(56, 189, 248, 0.15)')}
                   >
-                    <DeleteOutlined style={{ color: '#ef4444' }} />
-                    <span>Xóa thẻ</span>
+                    <EditOutlined style={{ color: '#38bdf8' }} />
+                    <span>Chỉnh sửa</span>
                   </button>
                 </div>
               </div>
@@ -749,14 +807,17 @@ export function CardsTab({
                           )}
 
                           <button
-                            onClick={() => onDeleteCard(card.id)}
-                            title="Xóa thẻ khỏi ví"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEditModal(card);
+                            }}
+                            title="Chỉnh sửa thông tin thẻ"
                             style={{
                               padding: '6px 12px',
                               borderRadius: '8px',
-                              background: 'rgba(239, 68, 68, 0.15)',
-                              border: '1px solid rgba(239, 68, 68, 0.35)',
-                              color: '#fca5a5',
+                              background: 'rgba(56, 189, 248, 0.15)',
+                              border: '1px solid rgba(56, 189, 248, 0.35)',
+                              color: '#38bdf8',
                               fontSize: '12px',
                               fontWeight: 700,
                               cursor: 'pointer',
@@ -765,8 +826,8 @@ export function CardsTab({
                               gap: '4px',
                             }}
                           >
-                            <DeleteOutlined style={{ color: '#ef4444' }} />
-                            <span>Xóa</span>
+                            <EditOutlined style={{ color: '#38bdf8' }} />
+                            <span>Sửa</span>
                           </button>
                         </div>
                       </td>
@@ -952,18 +1013,26 @@ export function CardsTab({
                   </button>
 
                   <button
-                    onClick={() => onDeleteCard(card.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenEditModal(card);
+                    }}
                     style={{
-                      padding: '8px 12px',
+                      padding: '8px 14px',
                       borderRadius: '10px',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      color: '#94a3b8',
+                      background: 'rgba(56, 189, 248, 0.15)',
+                      border: '1px solid rgba(56, 189, 248, 0.35)',
+                      color: '#38bdf8',
                       fontSize: '12px',
+                      fontWeight: 700,
                       cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
                     }}
                   >
-                    Xóa
+                    <EditOutlined style={{ color: '#38bdf8' }} />
+                    <span>Chỉnh sửa</span>
                   </button>
                 </div>
               </div>
@@ -1247,6 +1316,414 @@ export function CardsTab({
                     ? '⏳ Đang lưu...'
                     : `📊 Lưu ${selectedCardIds.length} thẻ đã chọn vào Google Sheet`}
                 </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CHỈNH SỬA THẺ */}
+      {editingCard && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.78)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10001,
+            padding: '20px',
+          }}
+          onClick={() => setEditingCard(null)}
+        >
+          <div
+            style={{
+              background: '#0f172a',
+              border: '1px solid rgba(56, 189, 248, 0.35)',
+              borderRadius: '24px',
+              width: '100%',
+              maxWidth: '560px',
+              maxHeight: '92vh',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(56, 189, 248, 0.15)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: '20px 24px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: 'rgba(30, 41, 59, 0.4)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '12px',
+                    background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ffffff',
+                    fontSize: '20px',
+                    boxShadow: '0 0 15px rgba(56, 189, 248, 0.4)',
+                  }}
+                >
+                  <EditOutlined />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#ffffff' }}>
+                    Chỉnh Sửa Thông Tin Thẻ
+                  </h3>
+                  <div style={{ fontSize: '12px', color: '#94a3b8' }}>
+                    Cập nhật tên gợi nhớ, ngân hàng, hạn mức và giao diện thẻ
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingCard(null)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '10px',
+                  color: '#94a3b8',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <CloseOutlined />
+              </button>
+            </div>
+
+            {/* Form Body */}
+            <div
+              style={{
+                padding: '20px 24px',
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '18px',
+              }}
+            >
+              {/* Tên gợi nhớ */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#cbd5e1', marginBottom: '6px' }}>
+                  TÊN GỢI NHỚ THẺ
+                </label>
+                <input
+                  type="text"
+                  value={editForm.nickname}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, nickname: e.target.value }))}
+                  placeholder="VD: Thẻ Chi Tiêu Chính, Thẻ Titanium..."
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '10px',
+                    background: 'rgba(30, 41, 59, 0.7)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    color: '#ffffff',
+                    fontSize: '14px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              {/* Chủ thẻ & Ngân hàng */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#cbd5e1', marginBottom: '6px' }}>
+                    CHỦ THẺ
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.holderName}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, holderName: e.target.value.toUpperCase() }))}
+                    placeholder="VD: LE HUYNH THUAN"
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderRadius: '10px',
+                      background: 'rgba(30, 41, 59, 0.7)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      color: '#ffffff',
+                      fontSize: '14px',
+                      fontFamily: 'monospace',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#cbd5e1', marginBottom: '6px' }}>
+                    NGÂN HÀNG PHÁT HÀNH
+                  </label>
+                  <select
+                    value={editForm.bankName}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, bankName: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderRadius: '10px',
+                      background: '#1e293b',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      color: '#ffffff',
+                      fontSize: '14px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {[
+                      'Vietcombank',
+                      'Techcombank',
+                      'MB Bank',
+                      'ACB',
+                      'BIDV',
+                      'VietinBank',
+                      'Sacombank',
+                      'VPBank',
+                      'TPBank',
+                      'OCB',
+                      'SHB',
+                      'HDBank',
+                      'SeABank',
+                      'Agribank',
+                      'Nam A Bank',
+                      'Cardflow Bank',
+                    ].map((bank) => (
+                      <option key={bank} value={bank} style={{ background: '#1e293b', color: '#ffffff' }}>
+                        {bank}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Hạn mức ngày */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#cbd5e1', marginBottom: '6px' }}>
+                  HẠN MỨC CHI TIÊU / NGÀY (VNĐ)
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="number"
+                    step="500000"
+                    min="1000000"
+                    value={editForm.dailyLimit}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, dailyLimit: Number(e.target.value) }))}
+                    placeholder="50000000"
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      paddingRight: '60px',
+                      borderRadius: '10px',
+                      background: 'rgba(30, 41, 59, 0.7)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      color: '#34d399',
+                      fontSize: '15px',
+                      fontWeight: 700,
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <span
+                    style={{
+                      position: 'absolute',
+                      right: '14px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      fontSize: '13px',
+                      color: '#94a3b8',
+                      fontWeight: 700,
+                    }}
+                  >
+                    ₫ / ngày
+                  </span>
+                </div>
+                <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+                  Hạn mức hiện tại: {editForm.dailyLimit ? editForm.dailyLimit.toLocaleString('vi-VN') : 0} VNĐ
+                </div>
+              </div>
+
+              {/* Giao diện thẻ (Card Theme) */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#cbd5e1', marginBottom: '8px' }}>
+                  GIAO DIỆN THẺ (CHỦ ĐỀ)
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                  {[
+                    { id: 'dark-cyber', label: 'Dark Cyber', grad: 'linear-gradient(135deg, #090d16, #0284c7)' },
+                    { id: 'gold-luxe', label: 'Gold Luxe VIP', grad: 'linear-gradient(135deg, #b45309, #f59e0b)' },
+                    { id: 'deep-sapphire', label: 'Deep Sapphire', grad: 'linear-gradient(135deg, #0369a1, #38bdf8)' },
+                    { id: 'crimson-ruby', label: 'Crimson Ruby', grad: 'linear-gradient(135deg, #be123c, #fb7185)' },
+                    { id: 'holographic', label: 'Holographic', grad: 'linear-gradient(135deg, #ec4899, #8b5cf6)' },
+                    { id: 'gold-elegance', label: 'Gold Elegance', grad: 'linear-gradient(135deg, #d4af37, #78350f)' },
+                  ].map((themeOpt) => {
+                    const isSelected = editForm.theme === themeOpt.id;
+                    return (
+                      <button
+                        key={themeOpt.id}
+                        type="button"
+                        onClick={() => setEditForm((prev) => ({ ...prev, theme: themeOpt.id as CardTheme }))}
+                        style={{
+                          padding: '10px 8px',
+                          borderRadius: '12px',
+                          background: isSelected ? 'rgba(56, 189, 248, 0.15)' : 'rgba(30, 41, 59, 0.5)',
+                          border: isSelected ? '2px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.08)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: '100%',
+                            height: '24px',
+                            borderRadius: '6px',
+                            background: themeOpt.grad,
+                            boxShadow: isSelected ? '0 0 10px rgba(56, 189, 248, 0.5)' : 'none',
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: isSelected ? 700 : 500,
+                            color: isSelected ? '#38bdf8' : '#cbd5e1',
+                          }}
+                        >
+                          {themeOpt.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Tính năng bảo mật */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#cbd5e1', marginBottom: '8px' }}>
+                  CÀI ĐẶT BẢO MẬT & TÍNH NĂNG
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  {[
+                    { key: 'onlinePayment', label: 'Thanh toán Online', value: editForm.onlinePayment },
+                    { key: 'internationalPayment', label: 'Thanh toán Quốc tế', value: editForm.internationalPayment },
+                    { key: 'atmWithdrawal', label: 'Rút tiền ATM', value: editForm.atmWithdrawal },
+                    { key: 'notificationsEnabled', label: 'Nhận thông báo', value: editForm.notificationsEnabled },
+                  ].map((setting) => (
+                    <button
+                      key={setting.key}
+                      type="button"
+                      onClick={() =>
+                        setEditForm((prev) => ({
+                          ...prev,
+                          [setting.key]: !prev[setting.key as keyof typeof editForm],
+                        }))
+                      }
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        background: setting.value ? 'rgba(34, 197, 94, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+                        border: setting.value ? '1px solid rgba(34, 197, 94, 0.35)' : '1px solid rgba(255, 255, 255, 0.08)',
+                        color: setting.value ? '#4ade80' : '#94a3b8',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <span>{setting.label}</span>
+                      <span
+                        style={{
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: '50%',
+                          background: setting.value ? '#22c55e' : 'rgba(255,255,255,0.1)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#ffffff',
+                          fontSize: '10px',
+                        }}
+                      >
+                        {setting.value && <CheckOutlined />}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                padding: '16px 24px',
+                borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: '12px',
+                background: 'rgba(30, 41, 59, 0.4)',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setEditingCard(null)}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '12px',
+                  background: 'transparent',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  color: '#cbd5e1',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Hủy
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveEdit}
+                style={{
+                  padding: '10px 22px',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
+                  border: 'none',
+                  color: '#ffffff',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 0 20px rgba(56, 189, 248, 0.4)',
+                }}
+              >
+                <CheckOutlined />
+                <span>Lưu thay đổi</span>
               </button>
             </div>
           </div>

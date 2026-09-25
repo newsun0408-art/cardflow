@@ -416,6 +416,13 @@ export function useDashboardState() {
     }
   };
 
+  const handleUpdateCard = (id: string, updatedFields: Partial<CardDataModel>) => {
+    setCards((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, ...updatedFields } : c))
+    );
+    showToast('✨ Đã cập nhật thông tin thẻ thành công');
+  };
+
   const handleAddCard = (newCardData: Omit<CardDataModel, 'id' | 'isLocked' | 'balance' | 'spentToday'>) => {
     const newId = `card-${Date.now()}`;
     const newCard: CardDataModel = {
@@ -665,6 +672,7 @@ export function useDashboardState() {
     handleSetDefaultCard,
     handleToggleSecuritySetting,
     handleDeleteCard,
+    handleUpdateCard,
     handleAddCard,
     handleAddTransaction,
     handleProfileSave,

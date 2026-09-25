@@ -62,6 +62,7 @@ export default function FullscreenDashboard() {
     handleSetDefaultCard,
     handleToggleSecuritySetting,
     handleDeleteCard,
+    handleUpdateCard,
     handleAddCard,
     handleAddTransaction,
     handleProfileSave,
@@ -198,6 +199,7 @@ export default function FullscreenDashboard() {
               onSetDefaultCard={handleSetDefaultCard}
               onToggleLock={handleToggleLock}
               onDeleteCard={handleDeleteCard}
+              onUpdateCard={handleUpdateCard}
               getCardMiniGradient={getCardMiniGradient}
               isBalanceHidden={isBalanceHidden}
               onSaveToGoogleSheet={(selectedCards) => handleSaveCardsToGoogleSheet(selectedCards)}

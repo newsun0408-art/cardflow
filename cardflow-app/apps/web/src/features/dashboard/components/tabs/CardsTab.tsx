@@ -25,7 +25,7 @@ interface CardsTabProps {
   onOpenAddCard: () => void;
   onSelectCard: (id: string, openDetail?: boolean) => void;
   onSetDefaultCard: (id: string) => void;
-  onToggleLock: (id: string) => void;
+  onToggleLock?: (id: string) => void;
   onDeleteCard?: (id: string) => void;
   onUpdateCard?: (id: string, updatedFields: Partial<CardDataModel>) => void;
   getCardMiniGradient: (theme: CardTheme) => string;
@@ -45,7 +45,7 @@ export function CardsTab({
   onOpenAddCard,
   onSelectCard,
   onSetDefaultCard,
-  onToggleLock,
+  onToggleLock: _onToggleLock,
   onDeleteCard: _onDeleteCard,
   onUpdateCard,
   getCardMiniGradient,
@@ -524,7 +524,7 @@ export function CardsTab({
                     </div>
                     <div>
                       <div>Trạng thái:</div>
-                      <div style={{ color: card.isLocked ? '#fca5a5' : '#4ade80', fontWeight: 700 }}>{card.isLocked ? '🔒 Đã khóa' : '⚡ Hoạt động'}</div>
+                      <div style={{ color: '#4ade80', fontWeight: 700 }}>⚡ Hoạt động</div>
                     </div>
                   </div>
                 </div>
@@ -759,12 +759,12 @@ export function CardsTab({
                             borderRadius: '6px',
                             fontSize: '11px',
                             fontWeight: 700,
-                            background: card.isLocked ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)',
-                            color: card.isLocked ? '#fca5a5' : '#4ade80',
-                            border: `1px solid ${card.isLocked ? 'rgba(239, 68, 68, 0.3)' : 'rgba(34, 197, 94, 0.3)'}`,
+                            background: 'rgba(34, 197, 94, 0.15)',
+                            color: '#4ade80',
+                            border: '1px solid rgba(34, 197, 94, 0.3)',
                           }}
                         >
-                          {card.isLocked ? '🔒 Đã khóa' : '⚡ Hoạt động'}
+                          ⚡ Hoạt động
                         </span>
                       </td>
 
@@ -953,11 +953,11 @@ export function CardsTab({
                         borderRadius: '6px',
                         fontSize: '11px',
                         fontWeight: 700,
-                        background: card.isLocked ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)',
-                        color: card.isLocked ? '#fca5a5' : '#4ade80',
+                        background: 'rgba(34, 197, 94, 0.15)',
+                        color: '#4ade80',
                       }}
                     >
-                      {card.isLocked ? '🔒 Đã khóa' : '⚡ Hoạt động'}
+                      ⚡ Hoạt động
                     </span>
                   </div>
                 </div>
@@ -995,22 +995,6 @@ export function CardsTab({
                       Đặt mặc định
                     </button>
                   )}
-
-                  <button
-                    onClick={() => onToggleLock(card.id)}
-                    style={{
-                      padding: '8px 12px',
-                      borderRadius: '10px',
-                      background: card.isLocked ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.15)',
-                      border: `1px solid ${card.isLocked ? 'rgba(239, 68, 68, 0.4)' : 'rgba(34, 197, 94, 0.3)'}`,
-                      color: card.isLocked ? '#fca5a5' : '#4ade80',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {card.isLocked ? 'Mở khóa' : 'Khóa'}
-                  </button>
 
                   <button
                     onClick={(e) => {
@@ -1248,8 +1232,8 @@ export function CardsTab({
                       <div style={{ fontSize: '13px', fontWeight: 700, color: '#ffffff' }}>
                         {card.dailyLimit.toLocaleString('vi-VN')} ₫
                       </div>
-                      <div style={{ fontSize: '11px', color: card.isLocked ? '#fca5a5' : '#4ade80' }}>
-                        {card.isLocked ? '🔒 Đã khóa' : '⚡ Hoạt động'}
+                      <div style={{ fontSize: '11px', color: '#4ade80' }}>
+                        ⚡ Hoạt động
                       </div>
                     </div>
                   </div>

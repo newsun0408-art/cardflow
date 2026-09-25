@@ -13,7 +13,6 @@ import {
   createCard,
   getTransactions,
   createTransaction,
-  updateCardStatus,
   getGoogleDriveStatus,
   saveCardsToSheet,
   type SaveCardsToSheetInput,
@@ -76,7 +75,7 @@ export const INITIAL_CARDS: CardDataModel[] = [
     expiryDate: '05/29',
     cvv: '•••',
     theme: 'deep-sapphire',
-    isLocked: true,
+    isLocked: false,
     isDefault: false,
     balance: 8500000,
     dailyLimit: 15000000,
@@ -359,23 +358,8 @@ export function useDashboardState() {
     showToast(`🔓 Xác thực thành công. Thông tin thẻ sẽ tự ẩn sau ${expiresSec}s`);
   };
 
-  const handleToggleLock = (id: string) => {
-    setCards((prev) =>
-      prev.map((c) => {
-        if (c.id === id) {
-          const nextLock = !c.isLocked;
-          showToast(nextLock ? `🔒 Đã khóa thẻ ${c.nickname}` : `🔓 Đã mở khóa thẻ ${c.nickname}`);
-
-          try {
-            const api = createApi();
-            updateCardStatus(api, id, nextLock ? 'LOCKED' : 'ACTIVE').catch(() => {});
-          } catch {}
-
-          return { ...c, isLocked: nextLock };
-        }
-        return c;
-      })
-    );
+  const handleToggleLock = (_id: string) => {
+    showToast('⚡ Thẻ luôn ở trạng thái hoạt động (không khóa thẻ)');
   };
 
   const handleSetDefaultCard = (id: string) => {

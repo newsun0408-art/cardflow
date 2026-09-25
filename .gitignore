@@ -18,9 +18,26 @@ bin/
 pgdata/
 *.log
 
-# Environment files
+# Environment files & Secrets
+.env
 .env.local
 .env.*.local
+.env.*
+!**/.env.example
+!**/example.env
+**/application-config/**
+!**/application-config/example.*
+!**/application-config/.gitkeep
+drive_store.json
+**/drive_store.json
+
+# Local backups & configs
+.agents/
+**/.agents/
+.git_backup/
+**/.git_backup/
+**/.mcp.json
+.mcp.json
 
 # OS files
 .DS_Store

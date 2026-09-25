@@ -35,5 +35,6 @@ export interface TransactionExpenseManagerProps {
   onToggleBalance: () => void;
   onAddTransaction: (newTx: Omit<TransactionItem, 'id' | 'referenceId' | 'status'>) => void;
   onOpenExportReport: () => void;
+  onOpenImportSheet?: () => void;
   onToast: (msg: string) => void;
 }

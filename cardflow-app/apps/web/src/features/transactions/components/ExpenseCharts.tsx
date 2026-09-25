@@ -20,6 +20,7 @@ import {
   UpOutlined,
   RobotOutlined,
   BulbOutlined,
+  FileExcelOutlined,
 } from '@ant-design/icons';
 import type { CategoryBreakdownItem } from '../types';
 import styles from '@/app/_components/TransactionExpenseManager.module.css';
@@ -41,6 +42,7 @@ interface ExpenseChartsProps {
   setSelectedCategoryDetail: (item: CategoryBreakdownItem | null) => void;
   onOpenAddTxModal: () => void;
   onOpenExportReport: () => void;
+  onOpenImportSheet?: () => void;
   onOpenAIModal: () => void;
   onOpenTipsModal: () => void;
   onToast: (msg: string) => void;
@@ -63,6 +65,7 @@ export function ExpenseCharts({
   setSelectedCategoryDetail,
   onOpenAddTxModal,
   onOpenExportReport,
+  onOpenImportSheet,
   onOpenAIModal,
   onOpenTipsModal,
   onToast,
@@ -196,6 +199,15 @@ export function ExpenseCharts({
           </div>
           <div className={styles.actionTitle}>Tiện ích<br />& Báo cáo</div>
         </div>
+
+        {onOpenImportSheet && (
+          <div className={styles.actionCard} onClick={onOpenImportSheet}>
+            <div className={styles.actionIconBox} style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399' }}>
+              <FileExcelOutlined />
+            </div>
+            <div className={styles.actionTitle}>Nhập từ<br />Google Sheet</div>
+          </div>
+        )}
       </div>
 
       {/* 2. CARD BOX: TÌNH HÌNH THU CHI */}

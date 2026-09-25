@@ -47,6 +47,9 @@ export default function FullscreenDashboard() {
     setSelectedTxDetail,
     isExportReportOpen,
     setIsExportReportOpen,
+    isImportSheetOpen,
+    setIsImportSheetOpen,
+    handleImportTransactionsSuccess,
     toastMessage,
     showToast,
     isSyncingToSheet,
@@ -219,6 +222,7 @@ export default function FullscreenDashboard() {
               onToggleBalance={handleToggleHideBalance}
               onAddTransaction={handleAddTransaction}
               onOpenExportReport={() => setIsExportReportOpen(true)}
+              onOpenImportSheet={() => setIsImportSheetOpen(true)}
               onToast={showToast}
             />
           )}
@@ -278,6 +282,11 @@ export default function FullscreenDashboard() {
         isExportReportOpen={isExportReportOpen}
         onCloseExportReport={() => setIsExportReportOpen(false)}
         exportTransactions={filteredTransactions.length > 0 ? filteredTransactions : transactions}
+        isImportSheetOpen={isImportSheetOpen}
+        onCloseImportSheet={() => setIsImportSheetOpen(false)}
+        onOpenImportSheet={() => setIsImportSheetOpen(true)}
+        onImportSuccess={handleImportTransactionsSuccess}
+        cards={cards}
         onToast={showToast}
       />
     </div>

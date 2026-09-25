@@ -21,6 +21,7 @@ export function TransactionExpenseManager({
   onToggleBalance,
   onAddTransaction,
   onOpenExportReport,
+  onOpenImportSheet,
   onToast,
 }: TransactionExpenseManagerProps) {
   // Navigation / Date state
@@ -165,6 +166,7 @@ export function TransactionExpenseManager({
         setSelectedCategoryDetail={setSelectedCategoryDetail}
         onOpenAddTxModal={() => setIsAddTxModalOpen(true)}
         onOpenExportReport={onOpenExportReport}
+        onOpenImportSheet={onOpenImportSheet}
         onOpenAIModal={() => setIsAIModalOpen(true)}
         onOpenTipsModal={() => setIsTipsModalOpen(true)}
         onToast={onToast}

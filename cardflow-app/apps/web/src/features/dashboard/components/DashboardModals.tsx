@@ -8,6 +8,7 @@ import { PersonalCard3D } from '@/app/_components/PersonalCard3D';
 import { CardQuickControls } from '@/app/_components/CardQuickControls';
 import { VerifyPinModal } from '@/app/_components/VerifyPinModal';
 import { ExportReportModal } from '@/app/_components/ExportReportModal';
+import { ImportSheetModal } from '@/app/_components/ImportSheetModal';
 import type { CardDataModel, TransactionItem } from '../types';
 
 interface DashboardModalsProps {
@@ -39,6 +40,11 @@ interface DashboardModalsProps {
   isExportReportOpen: boolean;
   onCloseExportReport: () => void;
   exportTransactions: TransactionItem[];
+  isImportSheetOpen?: boolean;
+  onCloseImportSheet?: () => void;
+  onOpenImportSheet?: () => void;
+  onImportSuccess?: (transactions: TransactionItem[], targetCardId?: string) => void;
+  cards?: CardDataModel[];
   onToast: (msg: string) => void;
 }
 
@@ -71,6 +77,11 @@ export function DashboardModals({
   isExportReportOpen,
   onCloseExportReport,
   exportTransactions,
+  isImportSheetOpen = false,
+  onCloseImportSheet,
+  onOpenImportSheet,
+  onImportSuccess,
+  cards,
   onToast,
 }: DashboardModalsProps) {
   return (
@@ -306,8 +317,21 @@ export function DashboardModals({
         holderName={activeCard.holderName}
         activeCardName={activeCard.nickname}
         onClose={onCloseExportReport}
+        onOpenImportSheet={onOpenImportSheet}
         onToast={onToast}
       />
+
+      {/* Import Transactions from Google Sheet Modal */}
+      {onCloseImportSheet && (
+        <ImportSheetModal
+          isOpen={isImportSheetOpen}
+          cards={cards || [activeCard]}
+          activeCardId={activeCard.id}
+          onClose={onCloseImportSheet}
+          onImportSuccess={onImportSuccess || (() => {})}
+          onToast={onToast}
+        />
+      )}
     </>
   );
 }

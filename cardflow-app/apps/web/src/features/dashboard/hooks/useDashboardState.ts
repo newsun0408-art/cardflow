@@ -127,6 +127,7 @@ export function useDashboardState() {
   const [isDetailCardModalOpen, setIsDetailCardModalOpen] = useState(false);
   const [selectedTxDetail, setSelectedTxDetail] = useState<TransactionItem | null>(null);
   const [isExportReportOpen, setIsExportReportOpen] = useState(false);
+  const [isImportSheetOpen, setIsImportSheetOpen] = useState(false);
 
   // Google Drive & Sheets Sync
   const [isSyncingToSheet, setIsSyncingToSheet] = useState(false);
@@ -407,6 +408,41 @@ export function useDashboardState() {
     showToast('✨ Đã cập nhật thông tin thẻ thành công');
   };
 
+  const handleImportTransactionsSuccess = (
+    newTransactions: TransactionItem[],
+    targetCardId?: string,
+  ) => {
+    if (!newTransactions || newTransactions.length === 0) return;
+
+    setTransactions((prev) => {
+      const existingRefs = new Set(prev.map((t) => t.referenceId));
+      const toAdd = newTransactions.filter((t) => !existingRefs.has(t.referenceId));
+      return [...toAdd, ...prev];
+    });
+
+    const addedExpensesByCard: Record<string, number> = {};
+    newTransactions.forEach((tx) => {
+      if (tx.amount < 0) {
+        const cid = targetCardId || tx.cardId;
+        addedExpensesByCard[cid] = (addedExpensesByCard[cid] || 0) + Math.abs(tx.amount);
+      }
+    });
+
+    if (Object.keys(addedExpensesByCard).length > 0) {
+      setCards((prev) =>
+        prev.map((c) => {
+          const added = addedExpensesByCard[c.id];
+          if (added) {
+            return { ...c, spentToday: c.spentToday + added };
+          }
+          return c;
+        }),
+      );
+    }
+
+    showToast(`📊 Đã nhập thành công ${newTransactions.length} giao dịch từ Google Sheet!`);
+  };
+
   const handleAddCard = (newCardData: Omit<CardDataModel, 'id' | 'isLocked' | 'balance' | 'spentToday'>) => {
     const newId = `card-${Date.now()}`;
     const newCard: CardDataModel = {
@@ -641,6 +677,9 @@ export function useDashboardState() {
     setSelectedTxDetail,
     isExportReportOpen,
     setIsExportReportOpen,
+    isImportSheetOpen,
+    setIsImportSheetOpen,
+    handleImportTransactionsSuccess,
     toastMessage,
     showToast,
     isSyncingToSheet,

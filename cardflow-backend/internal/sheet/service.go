@@ -8,6 +8,7 @@ import (
 	"time"
 
 	drivefeat "github.com/bangdinh/cardflow-backend/internal/drive"
+	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/sheets/v4"
 )
 
@@ -89,56 +90,67 @@ func (s *Service) CreateSpreadsheet(ctx context.Context, state, title string) (S
 		return SpreadsheetResponse{}, fmt.Errorf("init sheets client failed: %w", err)
 	}
 
-	ss := &sheets.Spreadsheet{
-		Properties: &sheets.SpreadsheetProperties{
-			Title: title,
-		},
-		Sheets: []*sheets.Sheet{
-			{
-				Properties: &sheets.SheetProperties{
-					Title: "Sheet1",
+	ds, err := drivefeat.NewDriveService(ctx, tok)
+	if err != nil {
+		return SpreadsheetResponse{}, fmt.Errorf("init drive client failed: %w", err)
+	}
+
+	folderID, err := drivefeat.EnsureFolder(ctx, ds, drivefeat.CardFlowFolderName)
+	if err != nil {
+		return SpreadsheetResponse{}, fmt.Errorf("ensure folder failed: %w", err)
+	}
+	_ = s.repo.SaveFolderID(ctx, state, folderID)
+
+	var spreadsheetID, spreadsheetURL string
+	// Try creating directly in the folder using Drive API (avoids 403 on root)
+	driveFileMeta := &drive.File{
+		Name:     title,
+		MimeType: "application/vnd.google-apps.spreadsheet",
+		Parents:  []string{folderID},
+	}
+	createdFile, dErr := ds.Files.Create(driveFileMeta).Fields("id, name, webViewLink").Context(ctx).Do()
+	if dErr == nil && createdFile != nil && createdFile.Id != "" {
+		spreadsheetID = createdFile.Id
+		spreadsheetURL = createdFile.WebViewLink
+	} else {
+		// Fallback to Sheets API create
+		ss := &sheets.Spreadsheet{
+			Properties: &sheets.SpreadsheetProperties{
+				Title: title,
+			},
+			Sheets: []*sheets.Sheet{
+				{
+					Properties: &sheets.SheetProperties{
+						Title: "Sheet1",
+					},
 				},
 			},
-		},
-	}
-	res, err := srv.Spreadsheets.Create(ss).Context(ctx).Do()
-	if err != nil {
-		return SpreadsheetResponse{}, fmt.Errorf("create spreadsheet failed: %w", err)
-	}
-
-	var folderID string
-	ds, err := drivefeat.NewDriveService(ctx, tok)
-	if err == nil {
-		fID, fErr := drivefeat.EnsureFolder(ctx, ds, drivefeat.CardFlowFolderName)
-		if fErr == nil {
-			folderID = fID
-			_ = s.repo.SaveFolderID(ctx, state, folderID)
-			// Move the created spreadsheet into the CardFlow folder
-			_, _ = ds.Files.Update(res.SpreadsheetId, nil).
-				AddParents(folderID).
-				RemoveParents("root").
-				Context(ctx).
-				Do()
-
-			// Register in imported files store
-			newFile := drivefeat.DriveFile{
-				ID:         res.SpreadsheetId,
-				Name:       res.Properties.Title,
-				MimeType:   "application/vnd.google-apps.spreadsheet",
-				WebViewURL: res.SpreadsheetUrl,
-			}
-			if existing, ok := s.repo.GetImportedFiles(ctx, state); ok {
-				_ = s.repo.SaveImportedFiles(ctx, state, append(existing, newFile))
-			} else {
-				_ = s.repo.SaveImportedFiles(ctx, state, []drivefeat.DriveFile{newFile})
-			}
 		}
+		res, cErr := srv.Spreadsheets.Create(ss).Context(ctx).Do()
+		if cErr != nil {
+			return SpreadsheetResponse{}, fmt.Errorf("create spreadsheet failed: %w", cErr)
+		}
+		spreadsheetID = res.SpreadsheetId
+		spreadsheetURL = res.SpreadsheetUrl
+		_, _ = ds.Files.Update(spreadsheetID, nil).AddParents(folderID).RemoveParents("root").Context(ctx).Do()
+	}
+
+	newFile := drivefeat.DriveFile{
+		ID:         spreadsheetID,
+		Name:       title,
+		MimeType:   "application/vnd.google-apps.spreadsheet",
+		WebViewURL: spreadsheetURL,
+	}
+	if existing, ok := s.repo.GetImportedFiles(ctx, state); ok {
+		_ = s.repo.SaveImportedFiles(ctx, state, append(existing, newFile))
+	} else {
+		_ = s.repo.SaveImportedFiles(ctx, state, []drivefeat.DriveFile{newFile})
 	}
 
 	return SpreadsheetResponse{
-		SpreadsheetID:  res.SpreadsheetId,
-		Title:          res.Properties.Title,
-		SpreadsheetURL: res.SpreadsheetUrl,
+		SpreadsheetID:  spreadsheetID,
+		Title:          title,
+		SpreadsheetURL: spreadsheetURL,
 		FolderID:       folderID,
 		FolderName:     drivefeat.CardFlowFolderName,
 	}, nil
@@ -307,32 +319,44 @@ func (s *Service) SaveCards(ctx context.Context, state string, cards []CardItemD
 		spreadsheetID = list.Files[0].Id
 		spreadsheetURL = list.Files[0].WebViewLink
 	} else {
-		// Create new spreadsheet
-		ss := &sheets.Spreadsheet{
-			Properties: &sheets.SpreadsheetProperties{
-				Title: sheetTitle,
-			},
-			Sheets: []*sheets.Sheet{
-				{
-					Properties: &sheets.SheetProperties{
-						Title: "Danh Sách Thẻ",
+		// Create new spreadsheet directly inside CardFlow folder using Drive API (avoids 403 on root)
+		driveFileMeta := &drive.File{
+			Name:     sheetTitle,
+			MimeType: "application/vnd.google-apps.spreadsheet",
+			Parents:  []string{folderID},
+		}
+		createdFile, dErr := ds.Files.Create(driveFileMeta).Fields("id, name, webViewLink").Context(ctx).Do()
+		if dErr == nil && createdFile != nil && createdFile.Id != "" {
+			spreadsheetID = createdFile.Id
+			spreadsheetURL = createdFile.WebViewLink
+		} else {
+			// Fallback to Sheets API create
+			ss := &sheets.Spreadsheet{
+				Properties: &sheets.SpreadsheetProperties{
+					Title: sheetTitle,
+				},
+				Sheets: []*sheets.Sheet{
+					{
+						Properties: &sheets.SheetProperties{
+							Title: "Danh Sách Thẻ",
+						},
 					},
 				},
-			},
-		}
-		created, cErr := srv.Spreadsheets.Create(ss).Context(ctx).Do()
-		if cErr != nil {
-			return SaveCardsResponse{}, fmt.Errorf("tạo Google Sheet thất bại: %w", cErr)
-		}
-		spreadsheetID = created.SpreadsheetId
-		spreadsheetURL = created.SpreadsheetUrl
+			}
+			created, cErr := srv.Spreadsheets.Create(ss).Context(ctx).Do()
+			if cErr != nil {
+				return SaveCardsResponse{}, fmt.Errorf("tạo Google Sheet thất bại: %w (drive fallback: %v)", cErr, dErr)
+			}
+			spreadsheetID = created.SpreadsheetId
+			spreadsheetURL = created.SpreadsheetUrl
 
-		// Move into CardFlow folder
-		_, _ = ds.Files.Update(spreadsheetID, nil).
-			AddParents(folderID).
-			RemoveParents("root").
-			Context(ctx).
-			Do()
+			// Move into CardFlow folder
+			_, _ = ds.Files.Update(spreadsheetID, nil).
+				AddParents(folderID).
+				RemoveParents("root").
+				Context(ctx).
+				Do()
+		}
 	}
 
 	// Prepare data rows

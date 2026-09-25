@@ -610,7 +610,16 @@ export function useDashboardState() {
     const targetCards = customCards || cards;
     try {
       const api = createApi();
-      const state = typeof window !== 'undefined' ? localStorage.getItem('cardflow_google_state') || '' : '';
+      let state = typeof window !== 'undefined' ? localStorage.getItem('cardflow_google_state') || '' : '';
+      if (!state) {
+        const driveStatus = await getGoogleDriveStatus(api);
+        if (driveStatus && driveStatus.state) {
+          state = driveStatus.state;
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('cardflow_google_state', state);
+          }
+        }
+      }
       const payload: SaveCardsToSheetInput = {
         state,
         cards: targetCards.map((c) => ({

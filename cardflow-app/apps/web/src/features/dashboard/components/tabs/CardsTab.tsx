@@ -13,6 +13,7 @@ import {
   CheckSquareOutlined,
   CloseOutlined,
   FileExcelOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import type { CardDataModel, CardsViewMode } from '../../types';
 import type { CardTheme } from '@/app/_components/PersonalCard3D';
@@ -33,6 +34,8 @@ interface CardsTabProps {
   onSaveToGoogleSheet?: (selectedCards?: CardDataModel[]) => void;
   isSyncingToSheet?: boolean;
   lastSheetUrl?: string | null;
+  onDeleteCardsSheet?: () => void | Promise<void>;
+  isDeletingCardsSheet?: boolean;
   isGoogleDriveConnected?: boolean;
   onConnectGoogleDrive?: () => void;
 }
@@ -53,6 +56,8 @@ export function CardsTab({
   onSaveToGoogleSheet,
   isSyncingToSheet,
   lastSheetUrl,
+  onDeleteCardsSheet,
+  isDeletingCardsSheet,
   isGoogleDriveConnected,
   onConnectGoogleDrive,
 }: CardsTabProps) {
@@ -115,6 +120,7 @@ export function CardsTab({
   // State quản lý việc chọn thẻ để lưu vào Google Sheet
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
   const [isCardSelectModalOpen, setIsCardSelectModalOpen] = useState(false);
+  const [isConfirmDeleteSheetOpen, setIsConfirmDeleteSheetOpen] = useState(false);
 
   // Toggle tick / bỏ tick 1 thẻ
   const toggleCardSelection = (id: string, e?: React.MouseEvent) => {
@@ -319,27 +325,57 @@ export function CardsTab({
           </button>
 
           {lastSheetUrl && (
-            <a
-              href={lastSheetUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Mở Google Sheet đã lưu"
-              style={{
-                padding: '10px 14px',
-                borderRadius: '12px',
-                background: 'rgba(16, 185, 129, 0.15)',
-                color: '#34d399',
-                border: '1px solid rgba(52, 211, 153, 0.3)',
-                fontWeight: 600,
-                fontSize: '12px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                textDecoration: 'none',
-              }}
-            >
-              <span>Mở Sheet ↗</span>
-            </a>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              <a
+                href={lastSheetUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Mở Google Sheet đã lưu"
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: '12px',
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  color: '#34d399',
+                  border: '1px solid rgba(52, 211, 153, 0.3)',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  textDecoration: 'none',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <span>Mở Sheet ↗</span>
+              </a>
+
+              {onDeleteCardsSheet && (
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmDeleteSheetOpen(true)}
+                  disabled={isDeletingCardsSheet}
+                  title="Xóa file Google Sheet danh sách thẻ trên Google Drive"
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: '12px',
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    color: '#f87171',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    fontWeight: 600,
+                    fontSize: '12px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: isDeletingCardsSheet ? 'not-allowed' : 'pointer',
+                    opacity: isDeletingCardsSheet ? 0.6 : 1,
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  <DeleteOutlined />
+                  <span>{isDeletingCardsSheet ? 'Đang xóa...' : 'Xóa Sheet'}</span>
+                </button>
+              )}
+            </div>
           )}
 
           <button
@@ -1708,6 +1744,112 @@ export function CardsTab({
               >
                 <CheckOutlined />
                 <span>Lưu thay đổi</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal xác nhận xóa Google Sheet danh sách thẻ */}
+      {isConfirmDeleteSheetOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+          }}
+          onClick={() => setIsConfirmDeleteSheetOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#131b2e',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              borderRadius: '20px',
+              padding: '28px',
+              maxWidth: '460px',
+              width: '100%',
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6), 0 0 25px rgba(239, 68, 68, 0.15)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ef4444',
+                  fontSize: '20px',
+                }}
+              >
+                <DeleteOutlined />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#f8fafc' }}>
+                  Xác nhận xóa Google Sheet
+                </h3>
+                <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94a3b8' }}>
+                  File danh sách thẻ trên Google Drive của bạn
+                </p>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '14px', color: '#cbd5e1', lineHeight: '1.6', margin: '0 0 24px' }}>
+              Hành động này sẽ xóa file Google Sheet danh sách thẻ cá nhân trong thư mục{' '}
+              <strong style={{ color: '#38bdf8' }}>CardFlow</strong> trên Google Drive của bạn. Bạn vẫn có thể bấm lưu lại bất cứ lúc nào.
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setIsConfirmDeleteSheetOpen(false)}
+                disabled={isDeletingCardsSheet}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '10px',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#94a3b8',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (onDeleteCardsSheet) {
+                    await onDeleteCardsSheet();
+                  }
+                  setIsConfirmDeleteSheetOpen(false);
+                }}
+                disabled={isDeletingCardsSheet}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  border: 'none',
+                  color: '#ffffff',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: isDeletingCardsSheet ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)',
+                }}
+              >
+                {isDeletingCardsSheet ? 'Đang xóa...' : 'Xác nhận xóa Sheet'}
               </button>
             </div>
           </div>

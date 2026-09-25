@@ -217,6 +217,37 @@ func (s *Service) ListFiles(ctx context.Context, state string) ([]DriveFile, err
 	return result, nil
 }
 
+// DeleteFile deletes a file or spreadsheet by ID from Google Drive.
+func (s *Service) DeleteFile(ctx context.Context, state, fileID string) error {
+	tok, ok := s.repo.GetToken(ctx, state)
+	if !ok || tok == nil {
+		return fmt.Errorf("Google account is not connected for this state")
+	}
+
+	ds, err := NewDriveService(ctx, tok)
+	if err != nil {
+		return fmt.Errorf("create Drive client failed: %w", err)
+	}
+
+	err = ds.Files.Delete(fileID).Context(ctx).Do()
+	if err != nil {
+		return fmt.Errorf("delete file from Google Drive failed: %w", err)
+	}
+
+	// Remove from imported files cache if present
+	if existing, ok := s.repo.GetImportedFiles(ctx, state); ok {
+		updated := make([]DriveFile, 0, len(existing))
+		for _, f := range existing {
+			if f.ID != fileID {
+				updated = append(updated, f)
+			}
+		}
+		_ = s.repo.SaveImportedFiles(ctx, state, updated)
+	}
+
+	return nil
+}
+
 // UploadTextFile uploads a text file directly into the "CardFlow" folder.
 func (s *Service) UploadTextFile(ctx context.Context, state, fileName, content string) (DriveFile, error) {
 	return s.UploadFile(ctx, UploadRequest{

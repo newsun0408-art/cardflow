@@ -17,6 +17,7 @@ import {
   saveCardsToSheet,
   type SaveCardsToSheetInput,
 } from '@cardflow-app/shared';
+import { deleteGoogleDriveFileAction } from '@/app/actions/google-integration';
 
 export const INITIAL_CARDS: CardDataModel[] = [
   {
@@ -131,6 +132,7 @@ export function useDashboardState() {
 
   // Google Drive & Sheets Sync
   const [isSyncingToSheet, setIsSyncingToSheet] = useState(false);
+  const [isDeletingCardsSheet, setIsDeletingCardsSheet] = useState(false);
   const [lastSheetUrl, setLastSheetUrl] = useState<string | null>(null);
   const [isGoogleDriveConnected, setIsGoogleDriveConnected] = useState(false);
 
@@ -144,6 +146,11 @@ export function useDashboardState() {
 
   // Check Google Drive status & listen for popup OAuth message
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedSheet = localStorage.getItem('cardflow_last_cards_sheet_url');
+      if (savedSheet) setLastSheetUrl(savedSheet);
+    }
+
     try {
       const api = createApi();
       getGoogleDriveStatus(api)
@@ -626,6 +633,12 @@ export function useDashboardState() {
       setIsGoogleDriveConnected(true);
       if (res.spreadsheetUrl) {
         setLastSheetUrl(res.spreadsheetUrl);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('cardflow_last_cards_sheet_url', res.spreadsheetUrl);
+          if (res.spreadsheetId) {
+            localStorage.setItem('cardflow_last_cards_sheet_id', res.spreadsheetId);
+          }
+        }
       }
       showToast(`📊 Đã lưu thành công ${targetCards.length} thẻ vào Google Sheet!`);
       return res;
@@ -640,6 +653,49 @@ export function useDashboardState() {
       throw err;
     } finally {
       setIsSyncingToSheet(false);
+    }
+  };
+
+  const handleDeleteCardsSheet = async () => {
+    if (!lastSheetUrl) return;
+    setIsDeletingCardsSheet(true);
+    try {
+      let fileId = typeof window !== 'undefined' ? localStorage.getItem('cardflow_last_cards_sheet_id') : null;
+      if (!fileId && lastSheetUrl) {
+        const match = lastSheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+        if (match && match[1]) fileId = match[1];
+      }
+
+      let state = typeof window !== 'undefined' ? localStorage.getItem('cardflow_google_state') : null;
+      if (!state) {
+        const api = createApi();
+        const status = await getGoogleDriveStatus(api);
+        state = status?.state || null;
+      }
+
+      if (fileId && state) {
+        const delRes = await deleteGoogleDriveFileAction({ state, fileId });
+        if (!delRes.success) {
+          console.warn('Could not delete sheet file from Google Drive:', delRes.error);
+        }
+      }
+
+      setLastSheetUrl(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('cardflow_last_cards_sheet_url');
+        localStorage.removeItem('cardflow_last_cards_sheet_id');
+      }
+      showToast('🗑️ Đã xóa Google Sheet danh sách thẻ thành công!');
+    } catch (err: any) {
+      console.error('Error deleting cards sheet:', err);
+      setLastSheetUrl(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('cardflow_last_cards_sheet_url');
+        localStorage.removeItem('cardflow_last_cards_sheet_id');
+      }
+      showToast('🗑️ Đã xóa liên kết Google Sheet danh sách thẻ!');
+    } finally {
+      setIsDeletingCardsSheet(false);
     }
   };
 
@@ -683,10 +739,12 @@ export function useDashboardState() {
     toastMessage,
     showToast,
     isSyncingToSheet,
+    isDeletingCardsSheet,
     lastSheetUrl,
     isGoogleDriveConnected,
     handleConnectGoogleDrive,
     handleSaveCardsToGoogleSheet,
+    handleDeleteCardsSheet,
     handleCardsViewModeChange,
     handleSelectCard,
     handleRequestToggleSensitive,

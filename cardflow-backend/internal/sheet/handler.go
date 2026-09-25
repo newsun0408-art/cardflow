@@ -46,13 +46,15 @@ func (h *Handler) SaveCards(c echo.Context) error {
 func (h *Handler) CreateSpreadsheet(c echo.Context) error {
 	var req CreateSpreadsheetRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{"error": err.Error()})
 	}
 	res, err := h.svc.CreateSpreadsheet(c.Request().Context(), req.State, req.Title)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{"error": err.Error()})
 	}
-	return c.JSON(http.StatusOK, res)
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"data": res,
+	})
 }
 
 // ReadRows handles reading data from a spreadsheet range.
@@ -63,33 +65,39 @@ func (h *Handler) ReadRows(c echo.Context) error {
 
 	res, err := h.svc.ReadRows(c.Request().Context(), state, spreadsheetID, readRange)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{"error": err.Error()})
 	}
-	return c.JSON(http.StatusOK, res)
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"data": res,
+	})
 }
 
 // AppendRows handles appending rows of data into a spreadsheet.
 func (h *Handler) AppendRows(c echo.Context) error {
 	var req AppendRowsRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{"error": err.Error()})
 	}
 	res, err := h.svc.AppendRows(c.Request().Context(), req.State, req.SpreadsheetID, req.Range, req.Values)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{"error": err.Error()})
 	}
-	return c.JSON(http.StatusOK, res)
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"data": res,
+	})
 }
 
 // UpdateRows handles overwriting a specific range of cells in a spreadsheet.
 func (h *Handler) UpdateRows(c echo.Context) error {
 	var req UpdateRowsRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{"error": err.Error()})
 	}
 	res, err := h.svc.UpdateRows(c.Request().Context(), req.State, req.SpreadsheetID, req.Range, req.Values)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{"error": err.Error()})
 	}
-	return c.JSON(http.StatusOK, res)
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"data": res,
+	})
 }

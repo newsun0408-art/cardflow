@@ -72,6 +72,12 @@ export interface UploadDriveResult {
   error?: string;
 }
 
+export interface DeleteDriveFileResult {
+  success: boolean;
+  fileId?: string;
+  error?: string;
+}
+
 /**
  * Server Action: Lấy link OAuth cấp quyền Google Drive & Sheets từ Go Backend.
  */
@@ -87,7 +93,60 @@ export async function getGoogleAuthUrlAction(): Promise<GoogleAuthUrlResult> {
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
+    const match = message.match(/(\{.*"authUrl".*\})/);
+    if (match && match[1]) {
+      try {
+        const parsed = JSON.parse(match[1]);
+        const state = parsed.state || parsed.data?.state;
+        const authUrl = parsed.authUrl || parsed.data?.authUrl;
+        if (state && authUrl) {
+          logger.info('Recovered Google OAuth authUrl from error message format', { state });
+          return { success: true, state, authUrl };
+        }
+      } catch {}
+    }
     logger.error('Failed to get Google auth URL from Go backend', { error: message });
+    return {
+      success: false,
+      error: message,
+    };
+  }
+}
+
+/**
+ * Server Action: Xóa file hoặc Google Sheet khỏi Google Drive qua Go Backend.
+ */
+export async function deleteGoogleDriveFileAction(payload: {
+  state: string;
+  fileId: string;
+}): Promise<DeleteDriveFileResult> {
+  const { state, fileId } = payload;
+  logger.info('Initiating Google Drive file delete via Go backend', { state, fileId });
+
+  if (!state) {
+    return {
+      success: false,
+      error: 'Tài khoản chưa được kết nối với Google Drive.',
+    };
+  }
+  if (!fileId) {
+    return {
+      success: false,
+      error: 'Mã file (fileId) không hợp lệ.',
+    };
+  }
+
+  try {
+    const api = createApi();
+    const res = await googleDriveApi.deleteFile(api, { state, fileId });
+    logger.info('Google Drive file deleted successfully via Go backend', { fileId });
+    return {
+      success: true,
+      fileId: res?.fileId || fileId,
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error('Google Drive file delete failed on Go backend', { fileId, error: message });
     return {
       success: false,
       error: message,

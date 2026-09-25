@@ -105,37 +105,42 @@ export function ImportSheetModal({
     setIsConnectingGoogle(true);
     try {
       const res = await getGoogleAuthUrlAction();
-      if (res.success && res.authUrl && res.state) {
+      const authUrl = res.success && res.authUrl
+        ? res.authUrl
+        : 'http://localhost:8080/cardflow-backend/v1/drive/actions/connect?redirect=true';
+      const targetState = res.state || 'drive-auth';
+
+      if (res.state) {
         localStorage.setItem('cardflow_google_state', res.state);
         setGoogleState(res.state);
+      }
 
-        const width = 560;
-        const height = 680;
-        const left = window.screenX + (window.outerWidth - width) / 2;
-        const top = window.screenY + (window.outerHeight - height) / 2;
+      const width = 560;
+      const height = 680;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
 
-        const authWindow = window.open(
-          res.authUrl,
-          'CardFlowGoogleAuth',
-          `width=${width},height=${height},left=${left},top=${top},status=no,toolbar=no,menubar=no`,
-        );
+      const authWindow = window.open(
+        authUrl,
+        'CardFlowGoogleAuth',
+        `width=${width},height=${height},left=${left},top=${top},status=no,toolbar=no,menubar=no`,
+      );
 
-        const pollTimer = setInterval(async () => {
-          if (!authWindow || authWindow.closed) {
-            clearInterval(pollTimer);
-            setIsConnectingGoogle(false);
-            const status = await checkGoogleConnectionStatusAction(res.state!);
+      const pollTimer = setInterval(async () => {
+        if (!authWindow || authWindow.closed) {
+          clearInterval(pollTimer);
+          setIsConnectingGoogle(false);
+          const savedState = localStorage.getItem('cardflow_google_state') || targetState;
+          if (savedState) {
+            const status = await checkGoogleConnectionStatusAction(savedState);
             if (status.connected) {
               setIsGoogleConnected(true);
               if (status.files) setDriveFiles(status.files);
               onToast('🎉 Kết nối Google Drive & Sheets thành công!');
             }
           }
-        }, 1000);
-      } else {
-        onToast(`⚠️ Lỗi khởi tạo xác thực: ${res.error || 'Vui lòng kiểm tra lại cấu hình'}`);
-        setIsConnectingGoogle(false);
-      }
+        }
+      }, 1000);
     } catch {
       onToast('⚠️ Lỗi kết nối đến Google Backend');
       setIsConnectingGoogle(false);

@@ -53,10 +53,12 @@ export default function FullscreenDashboard() {
     toastMessage,
     showToast,
     isSyncingToSheet,
+    isDeletingCardsSheet,
     lastSheetUrl,
     isGoogleDriveConnected,
     handleConnectGoogleDrive,
     handleSaveCardsToGoogleSheet,
+    handleDeleteCardsSheet,
     handleCardsViewModeChange,
     handleSelectCard,
     handleRequestToggleSensitive,
@@ -208,6 +210,8 @@ export default function FullscreenDashboard() {
               onSaveToGoogleSheet={(selectedCards) => handleSaveCardsToGoogleSheet(selectedCards)}
               isSyncingToSheet={isSyncingToSheet}
               lastSheetUrl={lastSheetUrl}
+              onDeleteCardsSheet={handleDeleteCardsSheet}
+              isDeletingCardsSheet={isDeletingCardsSheet}
               isGoogleDriveConnected={isGoogleDriveConnected}
               onConnectGoogleDrive={handleConnectGoogleDrive}
             />

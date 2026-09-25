@@ -395,8 +395,34 @@ export interface ImportSheetResponse {
 }
 
 export const googleDriveApi = {
-  connect: (api: HttpClient) =>
-    api.get<GoogleConnectResponse>('/cardflow-backend/v1/drive/actions/connect'),
+  connect: async (api: HttpClient): Promise<GoogleConnectResponse> => {
+    try {
+      const res = await api.get<any>('/cardflow-backend/v1/drive/actions/connect');
+      const item = res?.data || res;
+      if (item && item.authUrl) {
+        return item as GoogleConnectResponse;
+      }
+      return item as GoogleConnectResponse;
+    } catch (err: any) {
+      if (err && typeof err === 'object') {
+        const raw = err.body || err.response || err.data;
+        if (raw && typeof raw === 'object') {
+          const item = raw.data || raw;
+          if (item && item.authUrl) return item as GoogleConnectResponse;
+        }
+        const msg = err.message || '';
+        const match = msg.match(/nhận:\s*(\{.*\})/);
+        if (match) {
+          try {
+            const parsed = JSON.parse(match[1]);
+            const item = parsed.data || parsed;
+            if (item && item.authUrl) return item as GoogleConnectResponse;
+          } catch {}
+        }
+      }
+      throw err;
+    }
+  },
 
   listFiles: (api: HttpClient, state: string) =>
     api.get<GoogleDriveFile[]>(`/cardflow-backend/v1/drive/actions/files?state=${encodeURIComponent(state)}`),
@@ -409,6 +435,9 @@ export const googleDriveApi = {
 
   sync: (api: HttpClient, state: string) =>
     api.post<GoogleSyncResponse>('/cardflow-backend/v1/drive/actions/sync', { state }),
+
+  deleteFile: (api: HttpClient, payload: { state: string; fileId: string }) =>
+    api.post<{ success: boolean; fileId: string }>('/cardflow-backend/v1/drive/actions/delete', payload),
 };
 
 export const googleSheetApi = {

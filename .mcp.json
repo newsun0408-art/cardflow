@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "3fe": {
+      "command": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "--no-warnings",
+        "d:\\lehuynhthuan\\TencentDB-Agent-Memory\\MemoryKnowledge\\node_modules\\tsx\\dist\\cli.mjs",
+        "d:\\lehuynhthuan\\TencentDB-Agent-Memory\\MemoryKnowledge\\src\\mcp\\server.ts"
+      ],
+      "env": {
+        "AGENT_NAME": "Shared Agent",
+        "MCP_SERVER_NAME": "3fe",
+        "KNOWLEDGE_API_URL": "http://127.0.0.1:8424",
+        "KNOWLEDGE_API_TOKEN": "sk-mem-new-key123456",
+        "KNOWLEDGE_SERVICE_ID": "default",
+        "KNOWLEDGE_TEAM_ID": "team-lgjymhjjpp",
+        "KNOWLEDGE_WIKI_ID": "wiki-iu819qwl"
+      }
+    }
+  }
+}

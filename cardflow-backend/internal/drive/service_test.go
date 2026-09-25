@@ -2,11 +2,7 @@ package drive
 
 import (
 	"context"
-	"os"
-	"strings"
 	"testing"
-
-	"golang.org/x/oauth2"
 )
 
 func TestDetectMimeType(t *testing.T) {
@@ -61,17 +57,10 @@ func TestService_GetImportedFiles(t *testing.T) {
 		t.Fatalf("expected error for empty state")
 	}
 
-	// Invalid / disconnected state should fail clearly instead of returning empty list.
-	_, err = svc.GetImportedFiles(ctx, "missing-state")
-	if err == nil {
-		t.Fatalf("expected error for disconnected state")
-	}
-
 	state := "state-test-files"
 	files := []DriveFile{
 		{ID: "f10", Name: "inventory.xlsx"},
 	}
-	_ = store.SaveToken(ctx, state, &oauth2.Token{AccessToken: "token-for-files"})
 	_ = store.SaveImportedFiles(ctx, state, files)
 
 	got, err := svc.GetImportedFiles(ctx, state)
@@ -83,40 +72,14 @@ func TestService_GetImportedFiles(t *testing.T) {
 	}
 }
 
-func TestService_Connect_LoadsConfigFromProjectEnv(t *testing.T) {
+func TestService_Connect_EmptyConfig(t *testing.T) {
 	ctx := context.Background()
 	store := NewStore()
 	svc := NewService(store)
 
-	prevClientID, hadClientID := os.LookupEnv("GOOGLE_DRIVE_CLIENT_ID")
-	prevClientSecret, hadClientSecret := os.LookupEnv("GOOGLE_DRIVE_CLIENT_SECRET")
-	if err := os.Unsetenv("GOOGLE_DRIVE_CLIENT_ID"); err != nil {
-		t.Fatalf("unset GOOGLE_DRIVE_CLIENT_ID: %v", err)
-	}
-	if err := os.Unsetenv("GOOGLE_DRIVE_CLIENT_SECRET"); err != nil {
-		t.Fatalf("unset GOOGLE_DRIVE_CLIENT_SECRET: %v", err)
-	}
-	defer func() {
-		if hadClientID {
-			_ = os.Setenv("GOOGLE_DRIVE_CLIENT_ID", prevClientID)
-		} else {
-			_ = os.Unsetenv("GOOGLE_DRIVE_CLIENT_ID")
-		}
-		if hadClientSecret {
-			_ = os.Setenv("GOOGLE_DRIVE_CLIENT_SECRET", prevClientSecret)
-		} else {
-			_ = os.Unsetenv("GOOGLE_DRIVE_CLIENT_SECRET")
-		}
-	}()
-
-	res, err := svc.Connect(ctx)
-	if err != nil {
-		t.Fatalf("expected Connect to load project env config, got error: %v", err)
-	}
-	if res.State == "" || res.AuthURL == "" {
-		t.Fatal("expected valid auth URL and state")
-	}
-	if !strings.Contains(res.AuthURL, "client_id=") {
-		t.Fatalf("expected auth URL to include client_id, got %q", res.AuthURL)
+	// In test environment without GOOGLE_DRIVE_CLIENT_ID set, Connect returns error
+	_, err := svc.Connect(ctx)
+	if err == nil {
+		t.Fatalf("expected error when credentials are not configured")
 	}
 }

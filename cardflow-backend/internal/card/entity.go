@@ -1,32 +1,21 @@
-﻿package card
+package card
 
 import (
-	"github.com/bangdinh/go-kit/domain"
+	"time"
 )
 
-// Card represents the core financial card entity in Cardflow.
 type Card struct {
-	ID                   string `json:"id"`
-	Nickname             string `json:"nickname"`
-	BankName             string `json:"bankName"`
-	CardType             string `json:"cardType"`
-	LastFourDigits       string `json:"lastFourDigits"`
-	CardNumberFormatted  string `json:"cardNumberFormatted"`
-	FullCardNumber       string `json:"fullCardNumber"`
-	NfcID                string `json:"nfcId"`
-	HolderName           string `json:"holderName"`
-	ExpiryDate           string `json:"expiryDate"`
-	CVV                  string `json:"cvv"`
-	Theme                string `json:"theme"`
-	IsLocked             bool   `json:"isLocked"`
-	IsDefault            bool   `json:"isDefault"`
-	Balance              int64  `json:"balance"`
-	DailyLimit           int64  `json:"dailyLimit"`
-	SpentToday           int64  `json:"spentToday"`
-	OnlinePayment        bool   `json:"onlinePayment"`
-	InternationalPayment bool   `json:"internationalPayment"`
-	AtmWithdrawal        bool   `json:"atmWithdrawal"`
-	NotificationsEnabled bool   `json:"notificationsEnabled"`
-	PinHash              string `json:"pinHash"`
-	domain.Timestamps
+	ID            string    `json:"id"`
+	UserID        string    `json:"user_id"`
+	CardNumber    string    `json:"card_number"`
+	CardHolder    string    `json:"card_holder"`
+	Expiry        string    `json:"expiry"`
+	CVV           string    `json:"cvv"`
+	Balance       float64   `json:"balance"`
+	Currency      string    `json:"currency"`
+	CardType      string    `json:"card_type"`
+	Status        string    `json:"status"`
+	SpendingLimit float64   `json:"spending_limit"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }

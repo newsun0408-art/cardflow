@@ -12,6 +12,7 @@ type Repository interface {
 	ValidateState(ctx context.Context, state string) bool
 	SaveToken(ctx context.Context, state string, token *oauth2.Token) error
 	GetToken(ctx context.Context, state string) (*oauth2.Token, bool)
+	GetLatestToken(ctx context.Context) (*oauth2.Token, string, bool)
 
 	SaveFolderID(ctx context.Context, state, folderID string) error
 	GetFolderID(ctx context.Context, state string) (string, bool)

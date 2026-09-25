@@ -5,13 +5,12 @@
   width: 100%;
 }
 
-/* Quick Actions Grid (Dynamic 4-5 cards) */
+/* 4 Quick Actions Grid */
 .quickActionsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
 }
-
 
 @media (max-width: 768px) {
   .quickActionsGrid {

@@ -2,15 +2,10 @@ package sheet
 
 import (
 	"context"
-	"encoding/csv"
 	"errors"
 	"fmt"
-	"math"
-	"regexp"
-	"strconv"
 	"strings"
 	"time"
-	"unicode"
 
 	drivefeat "github.com/bangdinh/cardflow-backend/internal/drive"
 	"google.golang.org/api/sheets/v4"
@@ -24,29 +19,6 @@ type Service struct {
 // NewService creates a new Google Sheets service.
 func NewService(repo drivefeat.Repository) *Service {
 	return &Service{repo: repo}
-}
-
-var sheetURLRegex = regexp.MustCompile(`/spreadsheets/d/([a-zA-Z0-9-_]+)`)
-
-// ExtractSpreadsheetID extracts the raw spreadsheet ID from a full Google Sheets URL or returns the clean ID.
-func ExtractSpreadsheetID(input string) string {
-	input = strings.TrimSpace(input)
-	if m := sheetURLRegex.FindStringSubmatch(input); len(m) > 1 {
-		return m[1]
-	}
-	if strings.Contains(input, "id=") {
-		parts := strings.Split(input, "id=")
-		if len(parts) > 1 {
-			id := parts[1]
-			if idx := strings.IndexAny(id, "&/?#"); idx != -1 {
-				id = id[:idx]
-			}
-			return strings.TrimSpace(id)
-		}
-	}
-	input = strings.TrimPrefix(input, "https://")
-	input = strings.TrimPrefix(input, "http://")
-	return input
 }
 
 // resolveRange ensures the range maps to a valid sheet in the spreadsheet.
@@ -172,6 +144,7 @@ func (s *Service) CreateSpreadsheet(ctx context.Context, state, title string) (S
 	}, nil
 }
 
+
 // ReadRows reads cell values from a specified range in a spreadsheet.
 func (s *Service) ReadRows(ctx context.Context, state, spreadsheetID, readRange string) (ReadRowsResponse, error) {
 	if state == "" {
@@ -294,429 +267,181 @@ func (s *Service) UpdateRows(ctx context.Context, state, spreadsheetID, updateRa
 	}, nil
 }
 
-// Column header indices mapping
-type colIndices struct {
-	stt      int
-	refID    int
-	date     int
-	time     int
-	card     int
-	merchant int
-	category int
-	txType   int
-	amount   int
-	status   int
-}
-
-func defaultColIndices() colIndices {
-	return colIndices{
-		stt:      0,
-		refID:    1,
-		date:     2,
-		time:     3,
-		card:     4,
-		merchant: 5,
-		category: 6,
-		txType:   -1,
-		amount:   7,
-		status:   8,
-	}
-}
-
-func normalizeHeader(s string) string {
-	s = strings.ToLower(strings.TrimSpace(s))
-	// Remove accents for resilient matching
-	replacer := strings.NewReplacer(
-		"á", "a", "à", "a", "ả", "a", "ã", "a", "ạ", "a",
-		"ă", "a", "ắ", "a", "ằ", "a", "ẳ", "a", "ẵ", "a", "ặ", "a",
-		"â", "a", "ấ", "a", "ầ", "a", "ẩ", "a", "ẫ", "a", "ậ", "a",
-		"đ", "d",
-		"é", "e", "è", "e", "ẻ", "e", "ẽ", "e", "ẹ", "e",
-		"ê", "e", "ế", "e", "ề", "e", "ể", "e", "ễ", "e", "ệ", "e",
-		"í", "i", "ì", "i", "ỉ", "i", "ĩ", "i", "ị", "i",
-		"ó", "o", "ò", "o", "ỏ", "o", "õ", "o", "ọ", "o",
-		"ô", "o", "ố", "o", "ồ", "o", "ổ", "o", "ỗ", "o", "ộ", "o",
-		"ơ", "o", "ớ", "o", "ờ", "o", "ở", "o", "ỡ", "o", "ợ", "o",
-		"ú", "u", "ù", "u", "ủ", "u", "ũ", "u", "ụ", "u",
-		"ư", "u", "ứ", "u", "ừ", "u", "ử", "u", "ữ", "u", "ự", "u",
-		"ý", "y", "ỳ", "y", "ỷ", "y", "ỹ", "y", "ỵ", "y",
-	)
-	return replacer.Replace(s)
-}
-
-func detectHeaderRow(rows [][]interface{}) (int, colIndices) {
-	for idx, row := range rows {
-		if idx > 15 {
-			break
-		}
-		cols := colIndices{
-			stt: -1, refID: -1, date: -1, time: -1, card: -1,
-			merchant: -1, category: -1, txType: -1, amount: -1, status: -1,
-		}
-		matches := 0
-
-		for colIdx, cell := range row {
-			str := normalizeHeader(fmt.Sprintf("%v", cell))
-			if str == "" {
-				continue
-			}
-			// Skip metadata / summary cells
-			if strings.HasPrefix(str, "chu the") || strings.HasPrefix(str, "the ap dung") ||
-				strings.HasPrefix(str, "ngay xuat") || strings.HasPrefix(str, "cardflow") ||
-				strings.HasPrefix(str, "tong chi") || strings.HasPrefix(str, "tong thu") ||
-				strings.HasPrefix(str, "bien dong") {
-				continue
-			}
-
-			switch {
-			case str == "stt" || str == "no" || str == "#":
-				cols.stt = colIdx
-				matches++
-			case strings.Contains(str, "ma gd") || strings.Contains(str, "ma giao dich") ||
-				strings.Contains(str, "reference") || strings.Contains(str, "ref id") ||
-				strings.Contains(str, "txn") || str == "id":
-				cols.refID = colIdx
-				matches++
-			case strings.Contains(str, "ngay") || strings.Contains(str, "date"):
-				cols.date = colIdx
-				matches++
-			case strings.Contains(str, "gio") || strings.Contains(str, "time"):
-				cols.time = colIdx
-				matches++
-			case (strings.Contains(str, "the") && !strings.Contains(str, "chu the")) ||
-				strings.Contains(str, "card") || strings.Contains(str, "last4"):
-				cols.card = colIdx
-				matches++
-			case strings.Contains(str, "merchant") || strings.Contains(str, "don vi") ||
-				strings.Contains(str, "cua hang") || strings.Contains(str, "noi dung") ||
-				strings.Contains(str, "chap nhan"):
-				cols.merchant = colIdx
-				matches++
-			case strings.Contains(str, "danh muc") || strings.Contains(str, "category"):
-				cols.category = colIdx
-				matches++
-			case str == "loai" || strings.Contains(str, "type"):
-				cols.txType = colIdx
-			case strings.Contains(str, "so tien") || strings.Contains(str, "amount") || strings.Contains(str, "tien"):
-				cols.amount = colIdx
-				matches++
-			case strings.Contains(str, "trang thai") || strings.Contains(str, "status"):
-				cols.status = colIdx
-				matches++
-			}
-		}
-
-		// A valid transaction header row MUST have an amount column and at least 2 other transaction columns
-		if cols.amount != -1 && matches >= 3 {
-			return idx, cols
-		}
-	}
-
-	return -1, defaultColIndices()
-}
-
-func getCellString(row []interface{}, idx int) string {
-	if idx < 0 || idx >= len(row) || row[idx] == nil {
-		return ""
-	}
-	return strings.TrimSpace(fmt.Sprintf("%v", row[idx]))
-}
-
-// cleanAndParseAmount converts currency text to float64.
-// For Cardflow: expenses are negative, income is positive.
-func cleanAndParseAmount(raw string, typeHint string) (float64, string, error) {
-	s := strings.TrimSpace(raw)
-	if s == "" {
-		return 0, "expense", errors.New("số tiền trống")
-	}
-
-	isNegative := false
-	if strings.HasPrefix(s, "-") || (strings.HasPrefix(s, "(") && strings.HasSuffix(s, ")")) {
-		isNegative = true
-	}
-	typeHintLower := strings.ToLower(typeHint)
-	if strings.Contains(typeHintLower, "chi") || strings.Contains(typeHintLower, "expense") {
-		isNegative = true
-	} else if strings.Contains(typeHintLower, "thu") || strings.Contains(typeHintLower, "hoan") || strings.Contains(typeHintLower, "income") {
-		isNegative = false
-	}
-
-	// Remove common currency symbols and labels
-	s = strings.ReplaceAll(s, "₫", "")
-	s = strings.ReplaceAll(s, "VND", "")
-	s = strings.ReplaceAll(s, "vnd", "")
-	s = strings.ReplaceAll(s, "$", "")
-	s = strings.ReplaceAll(s, "(", "")
-	s = strings.ReplaceAll(s, ")", "")
-	s = strings.ReplaceAll(s, "+", "")
-	s = strings.ReplaceAll(s, "-", "")
-	s = strings.TrimSpace(s)
-
-	// Clean dots and commas
-	cleanNumber := strings.Builder{}
-	for _, r := range s {
-		if unicode.IsDigit(r) {
-			cleanNumber.WriteRune(r)
-		}
-	}
-
-	numStr := cleanNumber.String()
-	if numStr == "" {
-		return 0, "expense", errors.New("không thể chuyển đổi số tiền")
-	}
-
-	val, err := strconv.ParseFloat(numStr, 64)
-	if err != nil {
-		return 0, "expense", err
-	}
-
-	var txType string
-	if isNegative {
-		val = -math.Abs(val)
-		txType = "expense"
-	} else {
-		val = math.Abs(val)
-		txType = "income"
-	}
-
-	return val, txType, nil
-}
-
-func cleanCardLast4(raw string) string {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return "8842"
-	}
-	// Extract 4 digits if present
-	digits := ""
-	for _, r := range raw {
-		if unicode.IsDigit(r) {
-			digits += string(r)
-		}
-	}
-	if len(digits) >= 4 {
-		return digits[len(digits)-4:]
-	}
-	if len(digits) > 0 {
-		return digits
-	}
-	return "8842"
-}
-
-func mapCategory(label string) (code, cleanLabel string) {
-	norm := normalizeHeader(label)
-	switch {
-	case strings.Contains(norm, "am thuc") || strings.Contains(norm, "an uong") || strings.Contains(norm, "dining") || strings.Contains(norm, "cafe") || strings.Contains(norm, "ca phe"):
-		return "dining", "Ẩm thực & Cafe"
-	case strings.Contains(norm, "mua sam") || strings.Contains(norm, "shopping"):
-		return "shopping", "Mua sắm"
-	case strings.Contains(norm, "di chuyen") || strings.Contains(norm, "transport") || strings.Contains(norm, "xang") || strings.Contains(norm, "taxi"):
-		return "transport", "Di chuyển"
-	case strings.Contains(norm, "cong nghe") || strings.Contains(norm, "tech") || strings.Contains(norm, "dien thoai"):
-		return "tech", "Công nghệ"
-	case strings.Contains(norm, "luong") || strings.Contains(norm, "salary") || strings.Contains(norm, "thu nhap"):
-		return "salary", "Lương & Thu nhập"
-	case strings.Contains(norm, "hoan") || strings.Contains(norm, "refund"):
-		return "refund", "Hoàn tiền"
-	case strings.Contains(norm, "nha") || strings.Contains(norm, "housing") || strings.Contains(norm, "thue"):
-		return "housing", "Nhà ở & Tiện ích"
-	case strings.Contains(norm, "dau tu") || strings.Contains(norm, "investment") || strings.Contains(norm, "tiet kiem"):
-		return "investment", "Đầu tư & Tiết kiệm"
-	case strings.Contains(norm, "giao duc") || strings.Contains(norm, "education") || strings.Contains(norm, "khoa hoc"):
-		return "education", "Giáo dục"
-	default:
-		if label == "" {
-			return "other", "Khác"
-		}
-		return "other", strings.TrimSpace(label)
-	}
-}
-
-// ImportSheet reads a Google Sheet or CSV file from Drive, detects the header structure, parses each transaction row, and returns a verified preview response.
-func (s *Service) ImportSheet(ctx context.Context, req ImportSheetRequest) (ImportSheetResponse, error) {
-	if req.State == "" {
-		return ImportSheetResponse{}, errors.New("state is required")
-	}
-	cleanSpreadsheetID := ExtractSpreadsheetID(req.SpreadsheetID)
-	if cleanSpreadsheetID == "" {
-		return ImportSheetResponse{}, errors.New("spreadsheetId is required")
-	}
-
-	tok, ok := s.repo.GetToken(ctx, req.State)
+// SaveCards creates or updates a Google Sheet in the "CardFlow" folder with the given cards data.
+func (s *Service) SaveCards(ctx context.Context, state string, cards []CardItemDTO) (SaveCardsResponse, error) {
+	tok, ok := s.repo.GetToken(ctx, state)
 	if !ok || tok == nil {
-		return ImportSheetResponse{}, errors.New("Google account is not connected for this state")
+		var activeState string
+		tok, activeState, ok = s.repo.GetLatestToken(ctx)
+		if ok && activeState != "" {
+			state = activeState
+		}
+	}
+	if !ok || tok == nil {
+		return SaveCardsResponse{}, errors.New("Google Drive & Sheets chưa được kết nối. Vui lòng kết nối Google trước.")
 	}
 
 	srv, err := newSheetsService(ctx, tok)
 	if err != nil {
-		return ImportSheetResponse{}, fmt.Errorf("init sheets client failed: %w", err)
+		return SaveCardsResponse{}, fmt.Errorf("khởi tạo Google Sheets client thất bại: %w", err)
 	}
 
-	var rows [][]interface{}
-	title := "Google Sheet"
+	ds, err := drivefeat.NewDriveService(ctx, tok)
+	if err != nil {
+		return SaveCardsResponse{}, fmt.Errorf("khởi tạo Google Drive client thất bại: %w", err)
+	}
 
-	// Attempt 1: Fetch via Google Sheets API
-	sheetMeta, err := srv.Spreadsheets.Get(cleanSpreadsheetID).
-		Fields("properties(title),sheets(properties(title))").
+	folderID, err := drivefeat.EnsureFolder(ctx, ds, drivefeat.CardFlowFolderName)
+	if err != nil {
+		return SaveCardsResponse{}, fmt.Errorf("chuẩn bị thư mục Google Drive '%s' thất bại: %w", drivefeat.CardFlowFolderName, err)
+	}
+	_ = s.repo.SaveFolderID(ctx, state, folderID)
+
+	sheetTitle := "CardFlow - Danh Sách Thẻ Cá Nhân"
+	var spreadsheetID, spreadsheetURL string
+
+	// Check if the spreadsheet already exists in folder
+	q := fmt.Sprintf("name = '%s' and mimeType = 'application/vnd.google-apps.spreadsheet' and '%s' in parents and trashed = false", sheetTitle, folderID)
+	list, lErr := ds.Files.List().Q(q).Fields("files(id, name, webViewLink)").PageSize(1).Context(ctx).Do()
+	if lErr == nil && len(list.Files) > 0 {
+		spreadsheetID = list.Files[0].Id
+		spreadsheetURL = list.Files[0].WebViewLink
+	} else {
+		// Create new spreadsheet
+		ss := &sheets.Spreadsheet{
+			Properties: &sheets.SpreadsheetProperties{
+				Title: sheetTitle,
+			},
+			Sheets: []*sheets.Sheet{
+				{
+					Properties: &sheets.SheetProperties{
+						Title: "Danh Sách Thẻ",
+					},
+				},
+			},
+		}
+		created, cErr := srv.Spreadsheets.Create(ss).Context(ctx).Do()
+		if cErr != nil {
+			return SaveCardsResponse{}, fmt.Errorf("tạo Google Sheet thất bại: %w", cErr)
+		}
+		spreadsheetID = created.SpreadsheetId
+		spreadsheetURL = created.SpreadsheetUrl
+
+		// Move into CardFlow folder
+		_, _ = ds.Files.Update(spreadsheetID, nil).
+			AddParents(folderID).
+			RemoveParents("root").
+			Context(ctx).
+			Do()
+	}
+
+	// Prepare data rows
+	headers := []interface{}{
+		"STT",
+		"Tên Gợi Nhớ",
+		"Tên Chủ Thẻ",
+		"Số Thẻ (PAN)",
+		"Loại Thẻ",
+		"Mạng Thanh Toán",
+		"Ngân Hàng",
+		"Hạn Dùng / Ngày Phát Hành",
+		"Số Dư (VND)",
+		"Hạn Mức Ngày (VND)",
+		"Trạng Thái",
+		"Mã Thẻ (ID)",
+		"Thời Gian Cập Nhật",
+	}
+
+	nowStr := time.Now().Format("02/01/2006 15:04:05")
+	var rows [][]interface{}
+	rows = append(rows, headers)
+
+	for i, c := range cards {
+		stt := i + 1
+		category := "Thẻ Quốc Tế"
+		if strings.EqualFold(c.CardCategory, "domestic") || strings.Contains(strings.ToUpper(c.CardType), "NAPAS") || strings.Contains(strings.ToUpper(c.CardNetwork), "NAPAS") {
+			category = "Thẻ Nội Địa (Napas ATM)"
+		}
+		network := c.CardNetwork
+		if network == "" {
+			network = c.CardType
+		}
+		status := c.Status
+		if status == "" {
+			status = "Hoạt động"
+		}
+		holder := strings.ToUpper(strings.TrimSpace(c.HolderName))
+		expOrIssue := c.ExpiryOrIssueDate
+		if expOrIssue == "" {
+			expOrIssue = "N/A"
+		}
+
+		balanceStr := fmt.Sprintf("%d", c.Balance)
+		limitStr := fmt.Sprintf("%d", c.DailyLimit)
+
+		rows = append(rows, []interface{}{
+			stt,
+			c.Nickname,
+			holder,
+			c.CardNumber,
+			category,
+			network,
+			c.BankName,
+			expOrIssue,
+			balanceStr,
+			limitStr,
+			status,
+			c.ID,
+			nowStr,
+		})
+	}
+
+	// Clear older rows to prevent overlap
+	_, _ = srv.Spreadsheets.Values.Clear(spreadsheetID, "A1:Z500", &sheets.ClearValuesRequest{}).Context(ctx).Do()
+
+	resolvedRange := resolveRange(ctx, srv, spreadsheetID, "A1")
+	vr := &sheets.ValueRange{
+		Values: rows,
+	}
+	_, err = srv.Spreadsheets.Values.Update(spreadsheetID, resolvedRange, vr).
+		ValueInputOption("USER_ENTERED").
 		Context(ctx).
 		Do()
-	if err == nil && sheetMeta != nil {
-		if sheetMeta.Properties.Title != "" {
-			title = sheetMeta.Properties.Title
+	if err != nil {
+		return SaveCardsResponse{}, fmt.Errorf("ghi dữ liệu vào Google Sheet thất bại: %w", err)
+	}
+
+	// Save to imported files list
+	newFile := drivefeat.DriveFile{
+		ID:         spreadsheetID,
+		Name:       sheetTitle,
+		MimeType:   "application/vnd.google-apps.spreadsheet",
+		WebViewURL: spreadsheetURL,
+	}
+	if existing, ok := s.repo.GetImportedFiles(ctx, state); ok {
+		found := false
+		for i, ef := range existing {
+			if ef.ID == spreadsheetID {
+				existing[i] = newFile
+				found = true
+				break
+			}
 		}
-		resolvedRange := resolveRange(ctx, srv, cleanSpreadsheetID, req.Range)
-		valResp, vErr := srv.Spreadsheets.Values.Get(cleanSpreadsheetID, resolvedRange).Context(ctx).Do()
-		if vErr == nil && valResp != nil {
-			rows = valResp.Values
+		if !found {
+			existing = append(existing, newFile)
 		}
+		_ = s.repo.SaveImportedFiles(ctx, state, existing)
 	} else {
-		// Attempt 2: If Sheets API fails (e.g. file is CSV on Drive), try downloading via Drive API
-		ds, dErr := drivefeat.NewDriveService(ctx, tok)
-		if dErr == nil {
-			dFile, fErr := ds.Files.Get(cleanSpreadsheetID).Fields("id,name,mimeType").Context(ctx).Do()
-			if fErr == nil && dFile != nil {
-				title = dFile.Name
-				resp, dlErr := ds.Files.Get(cleanSpreadsheetID).Download()
-				if dlErr == nil && resp != nil {
-					defer resp.Body.Close()
-					r := csv.NewReader(resp.Body)
-					r.LazyQuotes = true
-					r.FieldsPerRecord = -1
-					records, readErr := r.ReadAll()
-					if readErr == nil {
-						for _, rec := range records {
-							row := make([]interface{}, len(rec))
-							for ci, val := range rec {
-								row[ci] = val
-							}
-							rows = append(rows, row)
-						}
-					}
-				}
-			}
-		}
-		if len(rows) == 0 && err != nil {
-			return ImportSheetResponse{}, fmt.Errorf("không thể đọc file từ Google: %w", err)
-		}
+		_ = s.repo.SaveImportedFiles(ctx, state, []drivefeat.DriveFile{newFile})
 	}
 
-	parsedItems := make([]ParsedTransactionItem, 0)
-	if len(rows) == 0 {
-		return ImportSheetResponse{
-			SpreadsheetID: cleanSpreadsheetID,
-			Title:         title,
-			TotalRows:     0,
-			ValidCount:    0,
-			ErrorCount:    0,
-			Transactions:  parsedItems,
-		}, nil
-	}
-
-	// 3. Find Header row and column map
-	headerIdx, cols := detectHeaderRow(rows)
-	startRow := 0
-	if headerIdx >= 0 {
-		startRow = headerIdx + 1
-	}
-
-	var totalExpense, totalIncome float64
-	validCount := 0
-	errorCount := 0
-
-	for i := startRow; i < len(rows); i++ {
-		row := rows[i]
-		if len(row) == 0 {
-			continue
-		}
-
-		refStr := getCellString(row, cols.refID)
-		merchantStr := getCellString(row, cols.merchant)
-		dateStr := getCellString(row, cols.date)
-		timeStr := getCellString(row, cols.time)
-		cardStr := getCellString(row, cols.card)
-		categoryStr := getCellString(row, cols.category)
-		typeHint := getCellString(row, cols.txType)
-		amountStr := getCellString(row, cols.amount)
-		statusStr := getCellString(row, cols.status)
-
-		// Skip header repeats or report summary lines (e.g. "Tổng chi tiêu:", "Tổng thu:")
-		firstCell := getCellString(row, 0)
-		lowerFirst := strings.ToLower(firstCell)
-		if strings.HasPrefix(lowerFirst, "tong ") || strings.HasPrefix(lowerFirst, "chu the:") || strings.HasPrefix(lowerFirst, "cardflow -") {
-			continue
-		}
-
-		// If row has neither amount nor merchant, skip it
-		if amountStr == "" && merchantStr == "" && refStr == "" {
-			continue
-		}
-
-		amount, txType, pErr := cleanAndParseAmount(amountStr, typeHint)
-		isValid := true
-		errorMsg := ""
-
-		if pErr != nil {
-			isValid = false
-			errorMsg = fmt.Sprintf("Lỗi số tiền '%s': %v", amountStr, pErr)
-			errorCount++
-		} else {
-			validCount++
-			if amount < 0 {
-				totalExpense += math.Abs(amount)
-			} else {
-				totalIncome += amount
-			}
-		}
-
-		if refStr == "" {
-			refStr = fmt.Sprintf("IMP-%s-%04d", time.Now().Format("20060102"), i+1)
-		}
-		if dateStr == "" {
-			dateStr = time.Now().Format("2006-01-02")
-		}
-		if timeStr == "" {
-			timeStr = "12:00"
-		}
-		if statusStr == "" {
-			statusStr = "Thành công"
-		}
-		if merchantStr == "" {
-			merchantStr = "Giao dịch không tên"
-		}
-
-		catCode, catLabel := mapCategory(categoryStr)
-		cardLast4 := cleanCardLast4(cardStr)
-
-		item := ParsedTransactionItem{
-			ID:            fmt.Sprintf("tx-imp-%d-%d", time.Now().UnixNano(), i),
-			ReferenceID:   refStr,
-			Date:          dateStr,
-			Time:          timeStr,
-			CardLast4:     cardLast4,
-			Merchant:      merchantStr,
-			Category:      catCode,
-			CategoryLabel: catLabel,
-			Amount:        amount,
-			Type:          txType,
-			Status:        statusStr,
-			IsValid:       isValid,
-			ErrorMessage:  errorMsg,
-		}
-
-		parsedItems = append(parsedItems, item)
-	}
-
-	netChange := totalIncome - totalExpense
-
-	return ImportSheetResponse{
-		SpreadsheetID: cleanSpreadsheetID,
-		Title:         title,
-		TotalRows:     len(parsedItems),
-		ValidCount:    validCount,
-		ErrorCount:    errorCount,
-		TotalExpense:  totalExpense,
-		TotalIncome:   totalIncome,
-		NetChange:     netChange,
-		Transactions:  parsedItems,
+	return SaveCardsResponse{
+		SpreadsheetID:  spreadsheetID,
+		SpreadsheetURL: spreadsheetURL,
+		FolderID:       folderID,
+		FolderName:     drivefeat.CardFlowFolderName,
+		SavedCards:     len(cards),
+		Message:        fmt.Sprintf("Đã lưu thành công %d thẻ vào Google Sheet trong thư mục '%s'", len(cards), drivefeat.CardFlowFolderName),
 	}, nil
 }
+

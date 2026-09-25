@@ -1,19 +1,72 @@
+// Client gọi backend. Một chỗ dựng, mọi nơi dùng.
 import { createHttpClient, type HttpClient } from 'fe-kit/http';
 import { env } from './env';
 
 export interface ApiOptions {
+  userId?: string;
   getToken?: () => string | null | Promise<string | null>;
   onUnauthorized?: () => Promise<string | null>;
 }
 
 export function createApi(options: ApiOptions = {}): HttpClient {
+  const isBrowser = typeof globalThis !== 'undefined' && 'document' in globalThis;
+  let uid = options.userId;
+  if (!uid && isBrowser) {
+    try {
+      uid = localStorage.getItem('cardflow_user_id') || 'usr-001';
+    } catch {
+      uid = 'usr-001';
+    }
+  }
+  if (!uid) uid = 'usr-001';
+
   return createHttpClient({
     baseUrl: env.endpoint('gateway'),
     service: 'gateway',
     getToken: options.getToken,
     onUnauthorized: options.onUnauthorized,
-    headers: { origin: env.endpoint('webOrigin') },
+    headers: isBrowser
+      ? { 'X-User-Id': uid }
+      : { origin: env.endpoint('webOrigin'), 'X-User-Id': uid },
   });
+}
+
+// ── Auth API ───────────────────────────────────────────────────
+export interface LoginInput {
+  email: string;
+  password: string;
+}
+
+export interface RegisterInput {
+  email: string;
+  password: string;
+  fullName: string;
+  phone?: string;
+}
+
+export interface UserAuthDto {
+  id: string;
+  email: string;
+  fullName: string;
+  phone?: string;
+  role: string;
+}
+
+export interface AuthResultDto {
+  token: string;
+  user: UserAuthDto;
+}
+
+export function loginApi(api: HttpClient, input: LoginInput): Promise<AuthResultDto> {
+  return api.post<AuthResultDto>('/api/v1/auth/login', input);
+}
+
+export function registerApi(api: HttpClient, input: RegisterInput): Promise<AuthResultDto> {
+  return api.post<AuthResultDto>('/api/v1/auth/register', input);
+}
+
+export function getMeApi(api: HttpClient): Promise<UserAuthDto> {
+  return api.get<UserAuthDto>('/api/v1/auth/me');
 }
 
 export interface HealthDto {
@@ -24,233 +77,171 @@ export function health(api: HttpClient): Promise<HealthDto> {
   return api.get<HealthDto>('/healthz');
 }
 
-// --- Card Feature Contract & API ---
-
+// ── Cards API ──────────────────────────────────────────────────
 export interface CardDto {
   id: string;
-  nickname: string;
-  bankName: string;
-  cardType: string;
-  lastFourDigits: string;
-  cardNumberFormatted: string;
-  nfcId: string;
-  holderName: string;
-  expiryDate: string;
-  cvv: string;
-  theme: string;
-  isLocked: boolean;
-  isDefault: boolean;
+  userId: string;
+  cardNumber: string;
+  cardHolder: string;
+  expiry: string;
   balance: number;
-  dailyLimit: number;
-  spentToday: number;
-  onlinePayment: boolean;
-  internationalPayment: boolean;
-  atmWithdrawal: boolean;
-  notificationsEnabled: boolean;
+  currency: string;
+  cardType: string;
+  status: 'ACTIVE' | 'LOCKED';
+  spendingLimit: number;
 }
 
-export interface CreateCardInput {
-  nickname: string;
-  bankName?: string;
+export function getCards(api: HttpClient): Promise<{ data: CardDto[] }> {
+  return api.get<{ data: CardDto[] }>('/api/v1/cards');
+}
+
+export interface CreateCardDto {
+  cardHolder: string;
   cardType?: string;
-  fullCardNumber?: string;
-  holderName: string;
-  expiryDate?: string;
-  cvv?: string;
-  theme?: string;
-  dailyLimit?: number;
-  pin?: string;
-  onlinePayment?: boolean;
-  internationalPayment?: boolean;
-  atmWithdrawal?: boolean;
-  notificationsEnabled?: boolean;
+  spendingLimit?: number;
 }
 
-export interface VerifyPinInput {
-  cardId: string;
-  pin: string;
+export function createCard(api: HttpClient, dto: CreateCardDto): Promise<{ data: CardDto }> {
+  return api.post<{ data: CardDto }>('/api/v1/cards', dto);
 }
 
-export interface DecryptedCardData {
-  fullCardNumber: string;
-  cvv: string;
+export function updateCardStatus(api: HttpClient, cardId: string, status: 'ACTIVE' | 'LOCKED'): Promise<{ data: { id: string; status: string } }> {
+  return api.patch<{ data: { id: string; status: string } }>( `/api/v1/cards/${cardId}/status`, { status });
 }
 
-export interface VerifyPinResult {
-  success: boolean;
-  decryptedData?: DecryptedCardData;
-  expiresInSeconds?: number;
-  error?: string;
-  attemptsLeft?: number;
-  lockedUntil?: number;
-}
-
-export interface ChangePinInput {
-  cardId: string;
-  oldPin: string;
-  newPin: string;
-}
-
-export interface SetLimitInput {
-  cardId: string;
-  dailyLimit: number;
-}
-
-export interface ToggleLockInput {
-  cardId: string;
-}
-
-export const cardApi = {
-  list: (api: HttpClient) =>
-    api.get<CardDto[]>('/cardflow-backend/v1/card/actions/list'),
-
-  getById: (api: HttpClient, cardId: string) =>
-    api.get<CardDto>(`/cardflow-backend/v1/card/actions/view/${cardId}`),
-
-  create: (api: HttpClient, data: CreateCardInput) =>
-    api.post<CardDto>('/cardflow-backend/v1/card/actions/create', data),
-
-  verifyPin: (api: HttpClient, data: VerifyPinInput) =>
-    api.post<VerifyPinResult>('/cardflow-backend/v1/card/actions/verify-pin', data),
-
-  changePin: (api: HttpClient, data: ChangePinInput) =>
-    api.post<{ success: boolean }>('/cardflow-backend/v1/card/actions/change-pin', data),
-
-  setLimit: (api: HttpClient, data: SetLimitInput) =>
-    api.post<{ success: boolean }>('/cardflow-backend/v1/card/actions/set-limit', data),
-
-  toggleLock: (api: HttpClient, data: ToggleLockInput) =>
-    api.post<{ success: boolean; isLocked: boolean }>('/cardflow-backend/v1/card/actions/toggle-lock', data),
-};
-
-// --- Google Drive & Sheets Integration Contract & API ---
-
-export interface GoogleConnectResponse {
-  state: string;
-  authUrl: string;
-}
-
-export interface GoogleDriveFile {
+// ── Transactions API ──────────────────────────────────────────
+export interface TransactionDto {
   id: string;
-  name: string;
-  mimeType?: string;
-  webViewUrl?: string;
-  size?: string;
+  cardId: string;
+  title: string;
+  amount: number;
+  type: 'EXPENSE' | 'INCOME';
+  category: 'TECHNOLOGY' | 'FOOD' | 'TRANSPORT' | 'HOUSING' | 'OTHER';
+  status: 'SUCCESS' | 'PENDING' | 'FAILED';
+  createdAt: string;
 }
 
-export interface GoogleSyncResponse {
+export interface CategoryBreakdownDto {
+  category: string;
+  name: string;
+  amount: number;
+  percentage: number;
+  color: string;
+}
+
+export interface ExpenseSummaryDto {
+  totalIncome: number;
+  totalExpense: number;
+  savingsRate: number;
+  breakdown: CategoryBreakdownDto[];
+}
+
+export function getTransactions(
+  api: HttpClient,
+  category = 'ALL',
+  status = 'ALL',
+): Promise<{ data: TransactionDto[] }> {
+  const query = new URLSearchParams();
+  if (category && category !== 'ALL') query.set('category', category);
+  if (status && status !== 'ALL') query.set('status', status);
+  const qStr = query.toString();
+  return api.get<{ data: TransactionDto[] }>(qStr ? `/api/v1/transactions?${qStr}` : '/api/v1/transactions');
+}
+
+export function getExpenseSummary(api: HttpClient): Promise<{ data: ExpenseSummaryDto }> {
+  return api.get<{ data: ExpenseSummaryDto }>('/api/v1/transactions/summary');
+}
+
+export interface CreateTransactionInput {
+  cardId?: string;
+  title: string;
+  amount: number;
+  type?: 'EXPENSE' | 'INCOME';
+  category?: string;
+  note?: string;
+}
+
+export function createTransaction(api: HttpClient, input: CreateTransactionInput): Promise<{ data: TransactionDto }> {
+  return api.post<{ data: TransactionDto }>('/api/v1/transactions', input);
+}
+
+// ── Google Drive & Sheets API ─────────────────────────────────
+export interface SaveCardsToSheetInput {
+  state?: string;
+  cards: {
+    id: string;
+    nickname: string;
+    bankName: string;
+    cardType: string;
+    cardCategory?: string;
+    cardNetwork?: string;
+    cardNumber: string;
+    holderName: string;
+    expiryOrIssueDate: string;
+    cvv?: string;
+    balance: number;
+    dailyLimit: number;
+    status: string;
+  }[];
+}
+
+export interface SaveCardsToSheetResult {
+  spreadsheetId: string;
+  spreadsheetUrl: string;
   folderId: string;
   folderName: string;
-  files: GoogleDriveFile[];
-  total: number;
+  savedCards: number;
+  message: string;
 }
 
-export interface GoogleUploadInput {
-  state: string;
-  fileName: string;
-  content: string;
-  mimeType?: string;
-}
-
-export interface GoogleSheetResponse {
-  spreadsheetId: string;
-  title: string;
-  spreadsheetUrl: string;
+export interface GoogleDriveStatusResult {
+  connected: boolean;
+  state?: string;
   folderId?: string;
   folderName?: string;
 }
 
-export interface AppendRowsInput {
-  state: string;
-  spreadsheetId: string;
-  range: string;
-  values: any[][];
+export async function getGoogleDriveStatus(api: HttpClient): Promise<GoogleDriveStatusResult> {
+  try {
+    const res = await api.get<any>('/cardflow-backend/v1/drive/actions/status');
+    return (res?.data || res) as GoogleDriveStatusResult;
+  } catch (err: any) {
+    if (err && typeof err === 'object') {
+      const raw = err.body || err.response || err.data;
+      if (raw && typeof raw === 'object' && ('connected' in raw || ('data' in raw && 'connected' in raw.data))) {
+        return (raw.data || raw) as GoogleDriveStatusResult;
+      }
+    }
+    return { connected: false };
+  }
 }
 
-export interface AppendRowsResponse {
-  spreadsheetId: string;
-  tableRange?: string;
-  updatedRange?: string;
-  updatedRows: number;
-  updatedColumns: number;
-  updatedCells: number;
+export async function saveCardsToSheet(api: HttpClient, input: SaveCardsToSheetInput): Promise<SaveCardsToSheetResult> {
+  try {
+    const res = await api.post<any>('/cardflow-backend/v1/sheet/actions/save-cards', input);
+    return (res?.data || res) as SaveCardsToSheetResult;
+  } catch (err: any) {
+    if (err && typeof err === 'object') {
+      const raw = err.body || err.response || err.data;
+      if (raw && typeof raw === 'object') {
+        const item = raw.data || raw;
+        if (item && item.spreadsheetId) {
+          return item as SaveCardsToSheetResult;
+        }
+      }
+      const msg = err.message || '';
+      const match = msg.match(/nhận:\s*(\{.*\})/);
+      if (match) {
+        try {
+          const parsed = JSON.parse(match[1]);
+          const item = parsed.data || parsed;
+          if (item && item.spreadsheetId) {
+            return item as SaveCardsToSheetResult;
+          }
+        } catch {}
+      }
+    }
+    throw err;
+  }
 }
-
-export interface ReadRowsResponse {
-  spreadsheetId: string;
-  range: string;
-  values: any[][];
-}
-
-export interface ParsedSheetTransaction {
-  id: string;
-  referenceId: string;
-  date: string;
-  time: string;
-  cardLast4: string;
-  merchant: string;
-  category: string;
-  categoryLabel: string;
-  amount: number;
-  type: 'expense' | 'income';
-  status: string;
-  isValid: boolean;
-  errorMessage?: string;
-}
-
-export interface ImportSheetInput {
-  state: string;
-  spreadsheetId: string;
-  range?: string;
-}
-
-export interface ImportSheetResponse {
-  spreadsheetId: string;
-  title: string;
-  totalRows: number;
-  validCount: number;
-  errorCount: number;
-  totalExpense: number;
-  totalIncome: number;
-  netChange: number;
-  transactions: ParsedSheetTransaction[];
-}
-
-export const googleDriveApi = {
-  connect: (api: HttpClient) =>
-    api.get<GoogleConnectResponse>('/cardflow-backend/v1/drive/actions/connect'),
-
-  listFiles: (api: HttpClient, state: string) =>
-    api.get<GoogleDriveFile[]>(`/cardflow-backend/v1/drive/actions/files?state=${encodeURIComponent(state)}`),
-
-  getImported: (api: HttpClient, state: string) =>
-    api.get<GoogleDriveFile[]>(`/cardflow-backend/v1/drive/actions/imported?state=${encodeURIComponent(state)}`),
-
-  upload: (api: HttpClient, payload: GoogleUploadInput) =>
-    api.post<GoogleDriveFile>('/cardflow-backend/v1/drive/actions/upload', payload),
-
-  sync: (api: HttpClient, state: string) =>
-    api.post<GoogleSyncResponse>('/cardflow-backend/v1/drive/actions/sync', { state }),
-};
-
-export const googleSheetApi = {
-  create: (api: HttpClient, payload: { state: string; title: string }) =>
-    api.post<GoogleSheetResponse>('/cardflow-backend/v1/sheet/actions/create', payload),
-
-  append: (api: HttpClient, payload: AppendRowsInput) =>
-    api.post<AppendRowsResponse>('/cardflow-backend/v1/sheet/actions/append', payload),
-
-  readRows: (api: HttpClient, params: { state: string; spreadsheetId: string; range?: string }) => {
-    const qs = new URLSearchParams({
-      state: params.state,
-      spreadsheetId: params.spreadsheetId,
-      ...(params.range ? { range: params.range } : {}),
-    });
-    return api.get<ReadRowsResponse>(`/cardflow-backend/v1/sheet/actions/read?${qs.toString()}`);
-  },
-
-  importSheet: (api: HttpClient, payload: ImportSheetInput) =>
-    api.post<ImportSheetResponse>('/cardflow-backend/v1/sheet/actions/import', payload),
-};
-
 

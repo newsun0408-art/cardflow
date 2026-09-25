@@ -6,24 +6,28 @@
 //
 // Endpoint là DNS công khai, không phải secret, nên nằm trong code và được
 // review cùng MR. Chỉ `OIDC_CLIENT_SECRET` mới đi qua env/CI.
-import { defineEnvironments } from 'fe-kit/config';
+import { defineEnvironments, envVar } from 'fe-kit/config';
+
+const gatewayUri = envVar('API_GATEWAY_URI') || 'http://localhost:8080';
 
 export const env = defineEnvironments(
   {
     uat: {
-      gateway: 'http://localhost:8080',
-      ssoIssuer: 'http://localhost:8080',
+      gateway: gatewayUri,
+      ssoIssuer: 'https://uat-sso.example.com',
       webOrigin: 'http://localhost:3000',
     },
     beta: {
-      gateway: 'http://localhost:8080',
-      ssoIssuer: 'http://localhost:8080',
-      webOrigin: 'http://localhost:3000',
+      gateway: 'https://beta-gateway.example.com',
+      ssoIssuer: 'https://beta-sso.example.com',
+      webOrigin: 'https://beta.example.com',
+
+      
     },
     prod: {
-      gateway: 'http://localhost:8080',
-      ssoIssuer: 'http://localhost:8080',
-      webOrigin: 'http://localhost:3000',
+      gateway: 'https://gateway.example.com',
+      ssoIssuer: 'https://sso.example.com',
+      webOrigin: 'https://app.example.com',
     },
   },
   {

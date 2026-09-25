@@ -1,4 +1,14 @@
 ﻿// Package main - Entrypoint chinh cho HTTP/gRPC Web Server.
+//
+// Standard Go Project Layout: moi tien trinh la 1 binary duoi cmd/, chia se chung
+// domain logic o internal/.
+//   - cmd/server  : HTTP/gRPC Web Server (Echo, fx DI, health check).
+//   - cmd/migrate : SQL migration runner.
+//   - cmd/worker  : background job / queue consumer.
+//   - cmd/cli     : admin/devops CLI.
+//
+// Giu main.go mong (thin entrypoint): chi bootstrap (config, logger, tracer, DI)
+// roi chay server; toan bo business logic nam o internal/.
 package main
 
 import (
@@ -21,6 +31,7 @@ import (
 
 	cardfeat "github.com/bangdinh/cardflow-backend/internal/card"
 	drivefeat "github.com/bangdinh/cardflow-backend/internal/drive"
+	txfeat "github.com/bangdinh/cardflow-backend/internal/transaction"
 	samplefeat "github.com/bangdinh/cardflow-backend/internal/sample"
 	sheetfeat "github.com/bangdinh/cardflow-backend/internal/sheet"
 )
@@ -44,8 +55,8 @@ func main() {
 	shutdown, err := observability.InitTracer(context.Background(), observability.TracerConfig{
 		ServiceName:  "cardflow-backend",
 		Environment:  cfg.App.Env,
-		OTLPEndpoint: cfg.Tracing.OTLPEndpoint,
-		SampleRatio:  cfg.Tracing.SampleRatio,
+		OTLPEndpoint: cfg.Tracing.OTLPEndpoint, // empty -> no-op exporter (no traces exported)
+		SampleRatio:  cfg.Tracing.SampleRatio,  // config-driven; lower it in staging/prod (don't ship 100%)
 	})
 	if err != nil {
 		logger.Fatal("tracer init failed", zap.Error(err))
@@ -95,14 +106,17 @@ func main() {
 			samplefeat.NewService,
 			samplefeat.NewHandler,
 			// card feature
-			func(client goredis.UniversalClient) *cardfeat.Cache {
-				return cardfeat.NewCache(client, logger)
-			},
-			func(pool *pgxpool.Pool, cache *cardfeat.Cache) cardfeat.Repository {
-				return cardfeat.NewStore(pool, logger, cache)
+			func(pool *pgxpool.Pool) cardfeat.Repository {
+				return cardfeat.NewStore(pool, logger)
 			},
 			cardfeat.NewService,
 			cardfeat.NewHandler,
+			// transaction feature
+			func(pool *pgxpool.Pool) txfeat.Repository {
+				return txfeat.NewStore(pool, logger)
+			},
+			txfeat.NewService,
+			txfeat.NewHandler,
 		),
 		app.WithInvokers(mountRoutes),
 	)
@@ -113,9 +127,12 @@ func main() {
 	a.Run()
 }
 
-func mountRoutes(e *echo.Echo, h *samplefeat.Handler, dh *drivefeat.Handler, sh *sheetfeat.Handler, ch *cardfeat.Handler) {
+func mountRoutes(e *echo.Echo, h *samplefeat.Handler, dh *drivefeat.Handler, sh *sheetfeat.Handler, ch *cardfeat.Handler, th *txfeat.Handler) {
+	// Health probes (/healthz, /readyz) do CORE tu dang ky khi *HealthHandler
+	// duoc provide vao fx.
 	h.RegisterRoutes(e)
 	dh.RegisterRoutes(e)
 	sh.RegisterRoutes(e)
 	ch.RegisterRoutes(e)
+	th.RegisterRoutes(e)
 }

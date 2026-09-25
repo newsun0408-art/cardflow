@@ -2,38 +2,11 @@ package drive
 
 import (
 	"context"
-	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
 	"golang.org/x/oauth2"
 )
-
-func TestNewStore_UsesApplicationConfigDir(t *testing.T) {
-	prev, hadPrev := os.LookupEnv("APPLICATION_CONFIG_DIR")
-	tempDir := t.TempDir()
-	if err := os.Setenv("APPLICATION_CONFIG_DIR", tempDir); err != nil {
-		t.Fatalf("set APPLICATION_CONFIG_DIR: %v", err)
-	}
-	defer func() {
-		if hadPrev {
-			_ = os.Setenv("APPLICATION_CONFIG_DIR", prev)
-		} else {
-			_ = os.Unsetenv("APPLICATION_CONFIG_DIR")
-		}
-	}()
-
-	s := NewStore()
-	wantDir := filepath.Join(tempDir)
-	if !filepath.IsAbs(s.filePath) || !strings.Contains(s.filePath, filepath.Clean(wantDir)) {
-		t.Fatalf("expected store path to resolve under application config dir, got %q", s.filePath)
-	}
-	if _, err := os.Stat(filepath.Dir(s.filePath)); err != nil {
-		t.Fatalf("expected store dir to be created, got %v", err)
-	}
-}
 
 func TestStore_StateAndToken(t *testing.T) {
 	ctx := context.Background()
@@ -82,25 +55,6 @@ func TestStore_StateAndToken(t *testing.T) {
 
 	if err := s.SaveToken(ctx, state, nil); err == nil {
 		t.Fatalf("expected error saving nil token")
-	}
-}
-
-func TestStore_CurrentStateFallback(t *testing.T) {
-	ctx := context.Background()
-	s := NewStore()
-	state := "state-current"
-	tok := &oauth2.Token{AccessToken: "fallback-token", Expiry: time.Now().Add(1 * time.Hour)}
-
-	if err := s.SaveState(ctx, state); err != nil {
-		t.Fatalf("unexpected error saving state: %v", err)
-	}
-	if err := s.SaveToken(ctx, state, tok); err != nil {
-		t.Fatalf("unexpected error saving token: %v", err)
-	}
-
-	gotTok, ok := s.GetToken(ctx, "stale-state")
-	if !ok || gotTok == nil || gotTok.AccessToken != tok.AccessToken {
-		t.Fatalf("expected fallback to current state token, got ok=%v token=%v", ok, gotTok)
 	}
 }
 

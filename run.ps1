@@ -1,4 +1,4 @@
-﻿param (
+param (
     [string]$Command = "help"
 )
 
@@ -28,7 +28,7 @@ switch ($Command.ToLower()) {
     "backend" {
         Write-Host "⚙️ Dang khoi chay Go Backend Server..." -ForegroundColor Yellow
         Set-Location "$rootDir\cardflow-backend"
-        go run ./cmd/server
+        go run -mod=mod ./cmd/api
     }
     "app" {
         Write-Host "🌐 Dang khoi chay Next.js Web Frontend..." -ForegroundColor Yellow
@@ -48,7 +48,7 @@ switch ($Command.ToLower()) {
         docker compose -f "$rootDir\cardflow-backend\docker-compose.yml" up -d postgres redis
         
         Write-Host "`n[2/3] Bat Go Backend tren cua so moi (Port 8080)..." -ForegroundColor Yellow
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$rootDir\cardflow-backend'; Write-Host '--- ⚙️ CARDFLOW GO BACKEND (:8080) ---' -ForegroundColor Green; go run ./cmd/server"
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$rootDir\cardflow-backend'; Write-Host '--- ⚙️ CARDFLOW GO BACKEND (:8080) ---' -ForegroundColor Green; go run -mod=mod ./cmd/api"
 
         Write-Host "`n[3/3] Bat Next.js Web Frontend tren cua so moi (Port 3000)..." -ForegroundColor Yellow
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$rootDir\cardflow-app'; Write-Host '--- 🌐 CARDFLOW WEB FRONTEND (:3000) ---' -ForegroundColor Cyan; pnpm --filter @cardflow-app/web dev"

@@ -19,6 +19,7 @@ import {
   backupToGoogleDriveAction,
   getGoogleAuthUrlAction,
   checkGoogleConnectionStatusAction,
+  getGoogleDriveStatusAction,
 } from '../actions/google-integration';
 
 export interface ReportTransactionItem {
@@ -74,16 +75,22 @@ export function ExportReportModal({
 
     if (typeof window !== 'undefined') {
       const savedState = localStorage.getItem('cardflow_google_state');
-      if (savedState) {
-        setGoogleState(savedState);
-        setIsCheckingGoogle(true);
-        checkGoogleConnectionStatusAction(savedState).then((res) => {
-          setIsGoogleConnected(res.connected);
-          setIsCheckingGoogle(false);
-        });
-      } else {
+      setIsCheckingGoogle(true);
+      getGoogleDriveStatusAction().then((status) => {
+        if (status.connected && status.state) {
+          setIsGoogleConnected(true);
+          setGoogleState(status.state);
+          localStorage.setItem('cardflow_google_state', status.state);
+        } else if (savedState) {
+          setGoogleState(savedState);
+          checkGoogleConnectionStatusAction(savedState).then((res) => {
+            setIsGoogleConnected(res.connected);
+          });
+        } else {
+          setIsGoogleConnected(false);
+        }
         setIsCheckingGoogle(false);
-      }
+      });
     }
   }, [isOpen]);
 
@@ -189,15 +196,15 @@ export function ExportReportModal({
     setIsConnectingGoogle(true);
     try {
       const res = await getGoogleAuthUrlAction();
-      if (!res.success || !res.authUrl || !res.state) {
-        onToast(`⚠️ Lỗi khởi tạo liên kết Google: ${res.error || 'Vui lòng thử lại'}`);
-        setIsConnectingGoogle(false);
-        return;
-      }
+      const authUrl = res.success && res.authUrl
+        ? res.authUrl
+        : 'http://localhost:8080/cardflow-backend/v1/drive/actions/connect?redirect=true';
+      const state = res.state || 'drive-auth';
 
-      const state = res.state;
-      localStorage.setItem('cardflow_google_state', state);
-      setGoogleState(state);
+      if (res.state) {
+        localStorage.setItem('cardflow_google_state', state);
+        setGoogleState(state);
+      }
 
       // Mở cửa sổ popup cấp quyền Google
       const width = 560;
@@ -205,7 +212,7 @@ export function ExportReportModal({
       const left = window.screenX + (window.outerWidth - width) / 2;
       const top = window.screenY + (window.outerHeight - height) / 2;
       const popup = window.open(
-        res.authUrl,
+        authUrl,
         'CardflowGoogleOAuth',
         `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
       );
@@ -216,21 +223,28 @@ export function ExportReportModal({
       const pollTimer = setInterval(async () => {
         attempts++;
         try {
-          const status = await checkGoogleConnectionStatusAction(state);
+          const status = await getGoogleDriveStatusAction();
           if (status.connected) {
             clearInterval(pollTimer);
             try {
               popup?.close();
             } catch {}
             setIsGoogleConnected(true);
+            if (status.state) {
+              setGoogleState(status.state);
+              localStorage.setItem('cardflow_google_state', status.state);
+            }
             setIsConnectingGoogle(false);
             onToast('🎉 Kết nối Google Drive & Sheets thành công! Thư mục "CardFlow" đã sẵn sàng.');
           } else if (attempts >= maxAttempts || (popup && popup.closed)) {
-            // Kiểm tra lần cuối trước khi dừng
-            const finalCheck = await checkGoogleConnectionStatusAction(state);
+            const finalCheck = await getGoogleDriveStatusAction();
             if (finalCheck.connected) {
               clearInterval(pollTimer);
               setIsGoogleConnected(true);
+              if (finalCheck.state) {
+                setGoogleState(finalCheck.state);
+                localStorage.setItem('cardflow_google_state', finalCheck.state);
+              }
               setIsConnectingGoogle(false);
               onToast('🎉 Kết nối Google Drive & Sheets thành công! Thư mục "CardFlow" đã sẵn sàng.');
             } else if (attempts >= maxAttempts) {
@@ -266,7 +280,17 @@ export function ExportReportModal({
       return;
     }
 
-    if (!isGoogleConnected || !googleState) {
+    let activeState = googleState;
+    if (!activeState) {
+      const status = await getGoogleDriveStatusAction();
+      if (status.connected && status.state) {
+        activeState = status.state;
+        setGoogleState(status.state);
+        setIsGoogleConnected(true);
+      }
+    }
+
+    if (!activeState) {
       onToast('👉 Vui lòng kết nối tài khoản Google trước khi xuất bảng tính.');
       handleConnectGoogle();
       return;
@@ -275,7 +299,7 @@ export function ExportReportModal({
     setIsExportingSheet(true);
     try {
       const res = await exportToGoogleSheetAction({
-        state: googleState,
+        state: activeState,
         title: `Sao Kê Giao Dịch Cardflow - ${new Date().toISOString().slice(0, 10)}`,
         holderName,
         cardName: activeCardName,
@@ -311,7 +335,17 @@ export function ExportReportModal({
       return;
     }
 
-    if (!isGoogleConnected || !googleState) {
+    let activeState = googleState;
+    if (!activeState) {
+      const status = await getGoogleDriveStatusAction();
+      if (status.connected && status.state) {
+        activeState = status.state;
+        setGoogleState(status.state);
+        setIsGoogleConnected(true);
+      }
+    }
+
+    if (!activeState) {
       onToast('👉 Vui lòng kết nối tài khoản Google trước khi lưu lên Google Drive.');
       handleConnectGoogle();
       return;
@@ -321,7 +355,7 @@ export function ExportReportModal({
     try {
       const csv = generateCSVContent();
       const res = await backupToGoogleDriveAction({
-        state: googleState,
+        state: activeState,
         fileName: `Sao_Ke_Cardflow_${new Date().toISOString().slice(0, 10)}.csv`,
         csvContent: csv,
       });

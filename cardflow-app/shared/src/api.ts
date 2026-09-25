@@ -437,15 +437,44 @@ export const googleDriveApi = {
     api.post<GoogleSyncResponse>('/cardflow-backend/v1/drive/actions/sync', { state }),
 
   deleteFile: (api: HttpClient, payload: { state: string; fileId: string }) =>
-    api.post<{ success: boolean; fileId: string }>('/cardflow-backend/v1/drive/actions/delete', payload),
+    safeRequest<{ success: boolean; fileId: string }>(() =>
+      api.post('/cardflow-backend/v1/drive/actions/delete', payload)
+    ),
 };
+
+async function safeRequest<T>(req: () => Promise<any>): Promise<T> {
+  try {
+    const res = await req();
+    return (res?.data !== undefined ? res.data : res) as T;
+  } catch (err: any) {
+    if (err && typeof err === 'object') {
+      const raw = err.body || err.response || err.data;
+      if (raw !== undefined) {
+        return (raw?.data !== undefined ? raw.data : raw) as T;
+      }
+      const msg = err.message || '';
+      const match = msg.match(/nhận:\s*(\{.*\}|\[.*\])/);
+      if (match && match[1]) {
+        try {
+          const parsed = JSON.parse(match[1]);
+          return (parsed?.data !== undefined ? parsed.data : parsed) as T;
+        } catch {}
+      }
+    }
+    throw err;
+  }
+}
 
 export const googleSheetApi = {
   create: (api: HttpClient, payload: { state: string; title: string }) =>
-    api.post<GoogleSheetResponse>('/cardflow-backend/v1/sheet/actions/create', payload),
+    safeRequest<GoogleSheetResponse>(() =>
+      api.post('/cardflow-backend/v1/sheet/actions/create', payload)
+    ),
 
   append: (api: HttpClient, payload: AppendRowsInput) =>
-    api.post<AppendRowsResponse>('/cardflow-backend/v1/sheet/actions/append', payload),
+    safeRequest<AppendRowsResponse>(() =>
+      api.post('/cardflow-backend/v1/sheet/actions/append', payload)
+    ),
 
   readRows: (api: HttpClient, params: { state: string; spreadsheetId: string; range?: string }) => {
     const qs = new URLSearchParams({
@@ -453,11 +482,15 @@ export const googleSheetApi = {
       spreadsheetId: params.spreadsheetId,
       ...(params.range ? { range: params.range } : {}),
     });
-    return api.get<ReadRowsResponse>(`/cardflow-backend/v1/sheet/actions/read?${qs.toString()}`);
+    return safeRequest<ReadRowsResponse>(() =>
+      api.get(`/cardflow-backend/v1/sheet/actions/read?${qs.toString()}`)
+    );
   },
 
   importSheet: (api: HttpClient, payload: ImportSheetInput) =>
-    api.post<ImportSheetResponse>('/cardflow-backend/v1/sheet/actions/import', payload),
+    safeRequest<ImportSheetResponse>(() =>
+      api.post('/cardflow-backend/v1/sheet/actions/import', payload)
+    ),
 };
 
 

@@ -217,7 +217,7 @@ func (s *Service) ListFiles(ctx context.Context, state string) ([]DriveFile, err
 	return result, nil
 }
 
-// DeleteFile deletes a file or spreadsheet by ID from Google Drive.
+// DeleteFile performs soft delete (moves the file or spreadsheet to Google Drive Trash).
 func (s *Service) DeleteFile(ctx context.Context, state, fileID string) error {
 	tok, ok := s.repo.GetToken(ctx, state)
 	if !ok || tok == nil {
@@ -229,9 +229,13 @@ func (s *Service) DeleteFile(ctx context.Context, state, fileID string) error {
 		return fmt.Errorf("create Drive client failed: %w", err)
 	}
 
-	err = ds.Files.Delete(fileID).Context(ctx).Do()
+	// Soft-delete: chuyển file vào Thùng rác (Trash) trên Google Drive
+	_, err = ds.Files.Update(fileID, &drive.File{Trashed: true}).Context(ctx).Do()
 	if err != nil {
-		return fmt.Errorf("delete file from Google Drive failed: %w", err)
+		// Fallback nếu tài khoản không hỗ trợ update Trashed
+		if delErr := ds.Files.Delete(fileID).Context(ctx).Do(); delErr != nil {
+			return fmt.Errorf("xóa file Google Drive thất bại: %w", err)
+		}
 	}
 
 	// Remove from imported files cache if present

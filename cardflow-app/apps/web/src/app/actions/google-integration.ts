@@ -5,11 +5,30 @@ import {
   createApi,
   googleDriveApi,
   googleSheetApi,
+  getGoogleDriveStatus,
   type GoogleDriveFile,
   type ParsedSheetTransaction,
 } from '@cardflow-app/shared';
 
 const logger = createLogger('google-integration-action');
+
+/**
+ * Server Action: Lấy trạng thái kết nối Google Drive từ Go Backend.
+ */
+export async function getGoogleDriveStatusAction(): Promise<{
+  connected: boolean;
+  state?: string;
+  folderId?: string;
+  folderName?: string;
+}> {
+  try {
+    const api = createApi();
+    const res = await getGoogleDriveStatus(api);
+    return res;
+  } catch {
+    return { connected: false };
+  }
+}
 
 export interface ImportSheetResult {
   success: boolean;
@@ -120,10 +139,16 @@ export async function deleteGoogleDriveFileAction(payload: {
   state: string;
   fileId: string;
 }): Promise<DeleteDriveFileResult> {
-  const { state, fileId } = payload;
-  logger.info('Initiating Google Drive file delete via Go backend', { state, fileId });
+  const { fileId } = payload;
+  let effectiveState = payload.state;
+  if (!effectiveState) {
+    const status = await getGoogleDriveStatusAction();
+    if (status.connected && status.state) effectiveState = status.state;
+  }
 
-  if (!state) {
+  logger.info('Initiating Google Drive file delete via Go backend', { state: effectiveState, fileId });
+
+  if (!effectiveState) {
     return {
       success: false,
       error: 'Tài khoản chưa được kết nối với Google Drive.',
@@ -138,7 +163,7 @@ export async function deleteGoogleDriveFileAction(payload: {
 
   try {
     const api = createApi();
-    const res = await googleDriveApi.deleteFile(api, { state, fileId });
+    const res = await googleDriveApi.deleteFile(api, { state: effectiveState, fileId });
     logger.info('Google Drive file deleted successfully via Go backend', { fileId });
     return {
       success: true,
@@ -200,16 +225,24 @@ export async function exportToGoogleSheetAction(payload: {
   cardName?: string;
   transactions: SheetTransactionItem[];
 }): Promise<ExportSheetResult> {
-  const { state, transactions, holderName = 'LÊ HUỲNH THUẬN', cardName = 'Tất cả các thẻ' } = payload;
+  const { transactions, holderName = 'LÊ HUỲNH THUẬN', cardName = 'Tất cả các thẻ' } = payload;
+  let effectiveState = payload.state;
+  if (!effectiveState) {
+    const status = await getGoogleDriveStatusAction();
+    if (status.connected && status.state) {
+      effectiveState = status.state;
+    }
+  }
+
   const title = payload.title || `Sao Kê Giao Dịch Cardflow - ${new Date().toISOString().slice(0, 10)}`;
 
   logger.info('Initiating Google Sheet export via Go backend', {
-    state,
+    state: effectiveState,
     title,
     txCount: transactions.length,
   });
 
-  if (!state) {
+  if (!effectiveState) {
     return {
       success: false,
       title,
@@ -222,7 +255,7 @@ export async function exportToGoogleSheetAction(payload: {
 
     // 1. Yêu cầu Go backend tạo Spreadsheet trong folder "CardFlow"
     const sheetRes = await googleSheetApi.create(api, {
-      state,
+      state: effectiveState,
       title,
     });
 
@@ -263,7 +296,7 @@ export async function exportToGoogleSheetAction(payload: {
 
     // 3. Append dữ liệu vào Sheet vừa tạo
     await googleSheetApi.append(api, {
-      state,
+      state: effectiveState,
       spreadsheetId: sheetRes.spreadsheetId,
       range: 'Sheet1!A1',
       values,
@@ -300,13 +333,19 @@ export async function backupToGoogleDriveAction(payload: {
   fileName?: string;
   csvContent: string;
 }): Promise<UploadDriveResult> {
-  const { state, csvContent } = payload;
+  const { csvContent } = payload;
+  let effectiveState = payload.state;
+  if (!effectiveState) {
+    const status = await getGoogleDriveStatusAction();
+    if (status.connected && status.state) effectiveState = status.state;
+  }
+
   const dateStr = new Date().toISOString().slice(0, 10);
   const fileName = payload.fileName || `Sao_Ke_Cardflow_${dateStr}.csv`;
 
-  logger.info('Initiating Google Drive backup via Go backend', { state, fileName });
+  logger.info('Initiating Google Drive backup via Go backend', { state: effectiveState, fileName });
 
-  if (!state) {
+  if (!effectiveState) {
     return {
       success: false,
       fileName,
@@ -317,7 +356,7 @@ export async function backupToGoogleDriveAction(payload: {
   try {
     const api = createApi();
     const res = await googleDriveApi.upload(api, {
-      state,
+      state: effectiveState,
       fileName,
       content: csvContent,
       mimeType: 'text/csv',
@@ -355,13 +394,19 @@ export async function importFromGoogleSheetAction(payload: {
   spreadsheetIdOrUrl: string;
   range?: string;
 }): Promise<ImportSheetResult> {
-  const { state, spreadsheetIdOrUrl, range } = payload;
+  const { spreadsheetIdOrUrl, range } = payload;
+  let effectiveState = payload.state;
+  if (!effectiveState) {
+    const status = await getGoogleDriveStatusAction();
+    if (status.connected && status.state) effectiveState = status.state;
+  }
+
   logger.info('Initiating Google Sheet import via Go backend', {
-    state,
+    state: effectiveState,
     sheetTarget: spreadsheetIdOrUrl,
   });
 
-  if (!state) {
+  if (!effectiveState) {
     return {
       success: false,
       error: 'Tài khoản chưa được kết nối với Google. Vui lòng kết nối trước.',
@@ -378,7 +423,7 @@ export async function importFromGoogleSheetAction(payload: {
   try {
     const api = createApi();
     const res = await googleSheetApi.importSheet(api, {
-      state,
+      state: effectiveState,
       spreadsheetId: spreadsheetIdOrUrl.trim(),
       range: range || '',
     });

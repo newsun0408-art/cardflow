@@ -1,6 +1,13 @@
-'use client';
-
-import { CloseOutlined } from '@ant-design/icons';
+import { useState } from 'react';
+import {
+  CloseOutlined,
+  CopyOutlined,
+  CheckOutlined,
+  CreditCardOutlined,
+  CalendarOutlined,
+  ShopOutlined,
+  TagOutlined,
+} from '@ant-design/icons';
 import { AddCardModal } from '@/app/_components/AddCardModal';
 import { ChangePinModal } from '@/app/_components/ChangePinModal';
 import { SetLimitModal } from '@/app/_components/SetLimitModal';
@@ -9,6 +16,7 @@ import { CardQuickControls } from '@/app/_components/CardQuickControls';
 import { VerifyPinModal } from '@/app/_components/VerifyPinModal';
 import { ExportReportModal } from '@/app/_components/ExportReportModal';
 import { ImportSheetModal } from '@/app/_components/ImportSheetModal';
+import { UserGuideModal } from '@/app/_components/UserGuideModal';
 import type { CardDataModel, TransactionItem } from '../types';
 
 interface DashboardModalsProps {
@@ -19,7 +27,7 @@ interface DashboardModalsProps {
   onClosePinModal: () => void;
   onPinSuccess: () => void;
   isLimitModalOpen: boolean;
-  activeCard: CardDataModel;
+  activeCard?: CardDataModel | null;
   onCloseLimitModal: () => void;
   onSaveLimit: (newLimit: number) => void;
   isDetailCardModalOpen: boolean;
@@ -46,6 +54,8 @@ interface DashboardModalsProps {
   onImportSuccess?: (transactions: TransactionItem[], targetCardId?: string) => void;
   cards?: CardDataModel[];
   onToast: (msg: string) => void;
+  isGuideModalOpen?: boolean;
+  onCloseGuideModal?: () => void;
 }
 
 export function DashboardModals({
@@ -83,7 +93,11 @@ export function DashboardModals({
   onImportSuccess,
   cards,
   onToast,
+  isGuideModalOpen = false,
+  onCloseGuideModal,
 }: DashboardModalsProps) {
+  const [hasCopiedRef, setHasCopiedRef] = useState(false);
+
   return (
     <>
       <AddCardModal
@@ -98,15 +112,17 @@ export function DashboardModals({
         onSuccess={onPinSuccess}
       />
 
-      <SetLimitModal
-        isOpen={isLimitModalOpen}
-        currentLimit={activeCard.dailyLimit}
-        onClose={onCloseLimitModal}
-        onSaveLimit={onSaveLimit}
-      />
+      {activeCard && (
+        <SetLimitModal
+          isOpen={isLimitModalOpen}
+          currentLimit={activeCard.dailyLimit}
+          onClose={onCloseLimitModal}
+          onSaveLimit={onSaveLimit}
+        />
+      )}
 
       {/* CARD DETAIL POPUP MODAL */}
-      {isDetailCardModalOpen && (
+      {isDetailCardModalOpen && activeCard && (
         <div
           style={{
             position: 'fixed',
@@ -215,64 +231,217 @@ export function DashboardModals({
             inset: 0,
             zIndex: 10000,
             background: 'rgba(2, 6, 23, 0.85)',
-            backdropFilter: 'blur(10px)',
+            backdropFilter: 'blur(12px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             padding: '16px',
+            boxSizing: 'border-box',
           }}
           onClick={onCloseTxDetail}
         >
           <div
             style={{
               width: '100%',
-              maxWidth: '420px',
-              background: 'rgba(15, 23, 42, 0.95)',
-              border: '1px solid rgba(56, 189, 248, 0.3)',
+              maxWidth: '460px',
+              background: 'linear-gradient(180deg, #0f172a 0%, #090d16 100%)',
+              border: '1px solid rgba(56, 189, 248, 0.35)',
               borderRadius: '24px',
               padding: '24px',
-              boxShadow: '0 25px 60px rgba(0,0,0,0.7)',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.8), 0 0 30px rgba(56, 189, 248, 0.15)',
+              position: 'relative',
+              boxSizing: 'border-box',
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={onCloseTxDetail}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: 'none',
+                color: '#94a3b8',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+              title="Đóng"
+            >
+              <CloseOutlined style={{ fontSize: '13px' }} />
+            </button>
+
+            {/* Header info */}
             <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-              <div style={{ fontSize: '36px', marginBottom: '8px' }}>🧾</div>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#ffffff' }}>Chi Tiết Giao Dịch</h3>
-              <div style={{ fontSize: '12px', color: '#94a3b8' }}>Mã GD: {selectedTxDetail.referenceId}</div>
+              <div
+                style={{
+                  width: '54px',
+                  height: '54px',
+                  margin: '0 auto 10px auto',
+                  borderRadius: '16px',
+                  background:
+                    selectedTxDetail.type === 'expense'
+                      ? 'rgba(236, 72, 153, 0.15)'
+                      : 'rgba(16, 185, 129, 0.15)',
+                  color: selectedTxDetail.type === 'expense' ? '#f472b6' : '#34d399',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '24px',
+                }}
+              >
+                {selectedTxDetail.type === 'expense' ? '💸' : '💰'}
+              </div>
+
+              <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: '#ffffff' }}>
+                Chi Tiết Giao Dịch
+              </h3>
+
+              <div
+                style={{
+                  fontSize: '26px',
+                  fontWeight: 900,
+                  color: selectedTxDetail.amount > 0 ? '#34d399' : '#f472b6',
+                  margin: '6px 0',
+                  letterSpacing: '-0.5px',
+                }}
+              >
+                {selectedTxDetail.amount > 0 ? '+' : ''}
+                {selectedTxDetail.amount.toLocaleString('vi-VN')} ₫
+              </div>
+
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  background: 'rgba(16, 185, 129, 0.12)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  padding: '2px 10px',
+                  borderRadius: '999px',
+                  fontSize: '11px',
+                  color: '#34d399',
+                  fontWeight: 700,
+                }}
+              >
+                ● {selectedTxDetail.status}
+              </span>
             </div>
 
-            <div style={{ background: 'rgba(30, 41, 59, 0.5)', padding: '16px', borderRadius: '14px', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '13px' }}>
-                <span style={{ color: '#94a3b8' }}>Đơn vị chấp nhận</span>
-                <span style={{ fontWeight: 700, color: '#ffffff' }}>{selectedTxDetail.merchant}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '13px' }}>
-                <span style={{ color: '#94a3b8' }}>Số tiền</span>
-                <span style={{ fontWeight: 800, color: selectedTxDetail.amount > 0 ? '#4ade80' : '#f8fafc' }}>
-                  {selectedTxDetail.amount.toLocaleString('vi-VN')} ₫
+            {/* Detail rows */}
+            <div
+              style={{
+                background: 'rgba(30, 41, 59, 0.45)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '16px',
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                marginBottom: '20px',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px' }}>
+                <span style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <ShopOutlined /> Đơn vị chấp nhận
+                </span>
+                <span style={{ fontWeight: 700, color: '#ffffff', textAlign: 'right', maxWidth: '240px' }}>
+                  {selectedTxDetail.merchant}
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '13px' }}>
-                <span style={{ color: '#94a3b8' }}>Thời gian</span>
-                <span style={{ color: '#cbd5e1' }}>{selectedTxDetail.date} {selectedTxDetail.time}</span>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px' }}>
+                <span style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <TagOutlined /> Danh mục
+                </span>
+                <span style={{ fontWeight: 600, color: '#38bdf8' }}>
+                  {selectedTxDetail.categoryLabel}
+                </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                <span style={{ color: '#94a3b8' }}>Trạng thái</span>
-                <span style={{ color: '#4ade80', fontWeight: 700 }}>{selectedTxDetail.status}</span>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px' }}>
+                <span style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <CreditCardOutlined /> Thẻ thanh toán
+                </span>
+                <span style={{ fontWeight: 600, color: '#cbd5e1', fontFamily: 'monospace' }}>
+                  •••• {selectedTxDetail.cardLast4}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px' }}>
+                <span style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <CalendarOutlined /> Thời gian GD
+                </span>
+                <span style={{ color: '#cbd5e1', fontWeight: 500 }}>
+                  {selectedTxDetail.dateDisplay || selectedTxDetail.date} lúc {selectedTxDetail.time}
+                </span>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontSize: '13px',
+                  paddingTop: '8px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                }}
+              >
+                <span style={{ color: '#94a3b8' }}>Mã GD</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontFamily: 'monospace', color: '#f8fafc', fontWeight: 700, fontSize: '12px' }}>
+                    {selectedTxDetail.referenceId}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (navigator.clipboard) {
+                        navigator.clipboard.writeText(selectedTxDetail.referenceId);
+                        setHasCopiedRef(true);
+                        setTimeout(() => setHasCopiedRef(false), 2000);
+                      }
+                    }}
+                    style={{
+                      background: 'rgba(56, 189, 248, 0.15)',
+                      border: '1px solid rgba(56, 189, 248, 0.3)',
+                      color: '#38bdf8',
+                      borderRadius: '6px',
+                      padding: '2px 8px',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                    title="Sao chép mã giao dịch"
+                  >
+                    {hasCopiedRef ? <><CheckOutlined /> Đã chép</> : <><CopyOutlined /> Sao chép</>}
+                  </button>
+                </div>
               </div>
             </div>
 
+            {/* Actions */}
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
+                type="button"
                 onClick={onReportTxIssue}
                 style={{
                   flex: 1,
                   padding: '10px 0',
                   borderRadius: '10px',
-                  background: 'rgba(239, 68, 68, 0.15)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
                   color: '#fca5a5',
-                  fontSize: '13px',
+                  fontSize: '12px',
                   fontWeight: 600,
                   cursor: 'pointer',
                 }}
@@ -281,17 +450,19 @@ export function DashboardModals({
               </button>
 
               <button
+                type="button"
                 onClick={onCloseTxDetail}
                 style={{
                   flex: 1,
                   padding: '10px 0',
                   borderRadius: '10px',
                   background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
-                  color: '#ffffff',
                   border: 'none',
+                  color: '#ffffff',
                   fontSize: '13px',
                   fontWeight: 700,
                   cursor: 'pointer',
+                  boxShadow: '0 4px 15px rgba(56, 189, 248, 0.25)',
                 }}
               >
                 Đóng
@@ -304,8 +475,8 @@ export function DashboardModals({
       {/* Secure PIN Verification Modal */}
       <VerifyPinModal
         isOpen={isVerifyPinModalOpen}
-        cardId={targetCardForPin?.id || activeCard.id}
-        cardName={targetCardForPin?.name || activeCard.nickname}
+        cardId={targetCardForPin?.id || activeCard?.id || ''}
+        cardName={targetCardForPin?.name || activeCard?.nickname || ''}
         onClose={onCloseVerifyPin}
         onSuccess={onVerifyPinSuccess}
       />
@@ -314,8 +485,8 @@ export function DashboardModals({
       <ExportReportModal
         isOpen={isExportReportOpen}
         transactions={exportTransactions}
-        holderName={activeCard.holderName}
-        activeCardName={activeCard.nickname}
+        holderName={activeCard?.holderName || 'LÊ HUỲNH THUẬN'}
+        activeCardName={activeCard?.nickname || 'Tất cả các thẻ'}
         onClose={onCloseExportReport}
         onOpenImportSheet={onOpenImportSheet}
         onToast={onToast}
@@ -325,13 +496,19 @@ export function DashboardModals({
       {onCloseImportSheet && (
         <ImportSheetModal
           isOpen={isImportSheetOpen}
-          cards={cards || [activeCard]}
-          activeCardId={activeCard.id}
+          cards={cards || (activeCard ? [activeCard] : [])}
+          activeCardId={activeCard?.id || ''}
           onClose={onCloseImportSheet}
           onImportSuccess={onImportSuccess || (() => {})}
           onToast={onToast}
         />
       )}
+
+      {/* User Feature Guide Modal */}
+      <UserGuideModal
+        isOpen={Boolean(isGuideModalOpen)}
+        onClose={onCloseGuideModal || (() => {})}
+      />
     </>
   );
 }

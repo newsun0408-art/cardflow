@@ -23,6 +23,8 @@ export function TransactionExpenseManager({
   onOpenExportReport,
   onOpenImportSheet,
   onToast,
+  activeTab = 'transactions',
+  onSelectTransaction,
 }: TransactionExpenseManagerProps) {
   // Navigation / Date state
   const [currentMonthIndex, setCurrentMonthIndex] = useState(0);
@@ -41,6 +43,8 @@ export function TransactionExpenseManager({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCardFilter, setSelectedCardFilter] = useState('all');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // Calculations for Totals & Categories
   const { totalExpense, totalIncome, categoryBreakdown } = useMemo(() => {
@@ -124,7 +128,7 @@ export function TransactionExpenseManager({
     return { totalExpense: expense, totalIncome: income, categoryBreakdown: breakdown };
   }, [transactions]);
 
-  // Filtered transactions for feed
+  // Filtered transactions for feed (tìm kiếm + thẻ + danh mục + khoảng ngày)
   const filteredTransactions = useMemo(() => {
     return transactions.filter((tx) => {
       const matchSearch =
@@ -136,9 +140,24 @@ export function TransactionExpenseManager({
       const matchCard = selectedCardFilter === 'all' || tx.cardId === selectedCardFilter;
       const matchCat = selectedCategoryFilter === 'all' || tx.category === selectedCategoryFilter;
 
-      return matchSearch && matchCard && matchCat;
+      const txDate = tx.date;
+      const matchStart = !startDate || txDate >= startDate;
+      const matchEnd = !endDate || txDate <= endDate;
+
+      return matchSearch && matchCard && matchCat && matchStart && matchEnd;
     });
-  }, [transactions, searchQuery, selectedCardFilter, selectedCategoryFilter]);
+  }, [transactions, searchQuery, selectedCardFilter, selectedCategoryFilter, startDate, endDate]);
+
+  // Thống kê chi và thu của các giao dịch trong khoảng đã lọc
+  const { filteredExpense, filteredIncome } = useMemo(() => {
+    let exp = 0;
+    let inc = 0;
+    filteredTransactions.forEach((tx) => {
+      if (tx.type === 'expense') exp += Math.abs(tx.amount);
+      else if (tx.type === 'income') inc += tx.amount;
+    });
+    return { filteredExpense: exp, filteredIncome: inc };
+  }, [filteredTransactions]);
 
   // Transactions belonging to selectedCategoryDetail
   const categoryTransactions = useMemo(() => {
@@ -146,44 +165,73 @@ export function TransactionExpenseManager({
     return transactions.filter((t) => t.category === selectedCategoryDetail.key && t.type === 'expense');
   }, [transactions, selectedCategoryDetail]);
 
+  const chartsComponent = (
+    <ExpenseCharts
+      totalExpense={totalExpense}
+      totalIncome={totalIncome}
+      categoryBreakdown={categoryBreakdown}
+      isBalanceHidden={isBalanceHidden}
+      onToggleBalance={onToggleBalance}
+      viewMode={viewMode}
+      setViewMode={setViewMode}
+      currentMonthIndex={currentMonthIndex}
+      setCurrentMonthIndex={setCurrentMonthIndex}
+      showCategoryDetails={showCategoryDetails}
+      setShowCategoryDetails={setShowCategoryDetails}
+      hoveredCategoryKey={hoveredCategoryKey}
+      setHoveredCategoryKey={setHoveredCategoryKey}
+      setSelectedCategoryDetail={setSelectedCategoryDetail}
+      onOpenAddTxModal={() => setIsAddTxModalOpen(true)}
+      onOpenExportReport={onOpenExportReport}
+      onOpenImportSheet={onOpenImportSheet}
+      onOpenAIModal={() => setIsAIModalOpen(true)}
+      onOpenTipsModal={() => setIsTipsModalOpen(true)}
+      onToast={onToast}
+    />
+  );
+
+  const feedComponent = (
+    <TransactionFeed
+      transactions={filteredTransactions}
+      cards={cards}
+      isBalanceHidden={isBalanceHidden}
+      searchQuery={searchQuery}
+      setSearchQuery={setSearchQuery}
+      selectedCardFilter={selectedCardFilter}
+      setSelectedCardFilter={setSelectedCardFilter}
+      selectedCategoryFilter={selectedCategoryFilter}
+      setSelectedCategoryFilter={setSelectedCategoryFilter}
+      startDate={startDate}
+      setStartDate={setStartDate}
+      endDate={endDate}
+      setEndDate={setEndDate}
+      onClearDateFilter={() => {
+        setStartDate('');
+        setEndDate('');
+      }}
+      totalAllTransactionsCount={transactions.length}
+      filteredExpense={filteredExpense}
+      filteredIncome={filteredIncome}
+      activeTab={activeTab}
+      onOpenAddTxModal={() => setIsAddTxModalOpen(true)}
+      onOpenExportReport={onOpenExportReport}
+      onOpenImportSheet={onOpenImportSheet}
+      onSelectTransaction={onSelectTransaction}
+    />
+  );
+
   return (
     <div className={styles.container}>
-      {/* 1. Quick Actions & Charts */}
-      <ExpenseCharts
-        totalExpense={totalExpense}
-        totalIncome={totalIncome}
-        categoryBreakdown={categoryBreakdown}
-        isBalanceHidden={isBalanceHidden}
-        onToggleBalance={onToggleBalance}
-        viewMode={viewMode}
-        setViewMode={setViewMode}
-        currentMonthIndex={currentMonthIndex}
-        setCurrentMonthIndex={setCurrentMonthIndex}
-        showCategoryDetails={showCategoryDetails}
-        setShowCategoryDetails={setShowCategoryDetails}
-        hoveredCategoryKey={hoveredCategoryKey}
-        setHoveredCategoryKey={setHoveredCategoryKey}
-        setSelectedCategoryDetail={setSelectedCategoryDetail}
-        onOpenAddTxModal={() => setIsAddTxModalOpen(true)}
-        onOpenExportReport={onOpenExportReport}
-        onOpenImportSheet={onOpenImportSheet}
-        onOpenAIModal={() => setIsAIModalOpen(true)}
-        onOpenTipsModal={() => setIsTipsModalOpen(true)}
-        onToast={onToast}
-      />
-
-      {/* 2. Transaction Feed */}
-      <TransactionFeed
-        transactions={filteredTransactions}
-        cards={cards}
-        isBalanceHidden={isBalanceHidden}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        selectedCardFilter={selectedCardFilter}
-        setSelectedCardFilter={setSelectedCardFilter}
-        selectedCategoryFilter={selectedCategoryFilter}
-        setSelectedCategoryFilter={setSelectedCategoryFilter}
-      />
+      {/* 
+        SỰ KHÁC BIỆT HOÀN TOÀN GIỮA 2 TRANG:
+        - Tab 'transactions' (Giao dịch): Trang sổ chi tiết giao dịch (Transaction Ledger). Tập trung vào bộ lọc từ ngày X đến ngày Y, tìm kiếm, thẻ, thêm/xuất sao kê. Không có biểu đồ Donut/Cột.
+        - Tab 'stats' (Thống kê): Trang phân tích dữ liệu tài chính (Analytics Hub). Tập trung vào Biểu đồ tỷ trọng Donut, Biểu đồ chi tiêu Cột, So sánh tháng, Ngân sách danh mục, AI Insights. Không có danh sách giao dịch dài dòng.
+      */}
+      {activeTab === 'transactions' ? (
+        feedComponent
+      ) : (
+        chartsComponent
+      )}
 
       {/* 3. Add Transaction Modal */}
       <AddTransactionModal

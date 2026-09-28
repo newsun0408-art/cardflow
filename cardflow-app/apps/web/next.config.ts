@@ -10,6 +10,11 @@ const config: NextConfig = {
     NEXT_PUBLIC_API_GATEWAY_URI: process.env.NEXT_PUBLIC_API_GATEWAY_URI || 'http://localhost:8080',
     APP_ENV: process.env.APP_ENV || 'uat',
   },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
+  },
 };
 
 export default config;

@@ -7,6 +7,7 @@ import {
   EyeOutlined,
   EyeInvisibleOutlined,
   LogoutOutlined,
+  QuestionCircleOutlined,
 } from '@ant-design/icons';
 import type { DashboardTab } from '../types';
 import type { UserProfile } from '@cardflow-app/shared';
@@ -21,6 +22,7 @@ interface DashboardHeaderProps {
   isBalanceHidden: boolean;
   onToggleHideBalance: () => void;
   onOpenAddCard: () => void;
+  onOpenGuideModal?: () => void;
   userProfile: UserProfile;
   getUserInitials: (name: string) => string;
 }
@@ -35,6 +37,7 @@ export function DashboardHeader({
   isBalanceHidden,
   onToggleHideBalance,
   onOpenAddCard,
+  onOpenGuideModal,
   userProfile,
   getUserInitials,
 }: DashboardHeaderProps) {
@@ -201,6 +204,32 @@ export function DashboardHeader({
           {isBalanceHidden ? <EyeInvisibleOutlined /> : <EyeOutlined />}
           <span>{isBalanceHidden ? 'Số dư: Ẩn' : 'Số dư: Hiện'}</span>
         </button>
+
+        {/* Quick User Guide Icon */}
+        {onOpenGuideModal && (
+          <button
+            type="button"
+            onClick={onOpenGuideModal}
+            style={{
+              background: 'rgba(56, 189, 248, 0.12)',
+              border: '1px solid rgba(56, 189, 248, 0.3)',
+              color: '#38bdf8',
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '16px',
+              fontWeight: 800,
+              transition: 'all 0.2s',
+            }}
+            title="Hướng dẫn sử dụng từng chức năng"
+          >
+            <QuestionCircleOutlined />
+          </button>
+        )}
 
         <div
           style={{

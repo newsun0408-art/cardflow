@@ -16,7 +16,7 @@ import type { CardDataModel, TransactionItem } from '../../types';
 
 interface OverviewTabProps {
   cards: CardDataModel[];
-  activeCard: CardDataModel;
+  activeCard?: CardDataModel | null;
   activeCardId: string;
   onSelectCard: (id: string) => void;
   onOpenAddCard: () => void;
@@ -78,6 +78,51 @@ export function OverviewTab({
   lastSheetUrl,
   isGoogleDriveConnected,
 }: OverviewTabProps) {
+  if (cards.length === 0 || !activeCard) {
+    return (
+      <div
+        style={{
+          textAlign: 'center',
+          padding: '60px 24px',
+          background: 'rgba(15, 23, 42, 0.6)',
+          border: '1px dashed rgba(56, 189, 248, 0.3)',
+          borderRadius: '24px',
+          backdropFilter: 'blur(16px)',
+          maxWidth: '680px',
+          margin: '40px auto',
+        }}
+      >
+        <div style={{ fontSize: '52px', marginBottom: '16px' }}>💳</div>
+        <h3 style={{ fontSize: '22px', fontWeight: 800, color: '#ffffff', marginBottom: '10px' }}>
+          Chào Mừng Bạn Đến Với CardFlow!
+        </h3>
+        <p style={{ color: '#94a3b8', fontSize: '14px', maxWidth: '480px', margin: '0 auto 24px auto', lineHeight: 1.6 }}>
+          Tài khoản của bạn chưa có thẻ thanh toán nào. Hãy bấm thêm chiếc thẻ cá nhân đầu tiên để bắt đầu trải nghiệm quản lý chi tiêu và các lớp bảo mật thông minh!
+        </p>
+        <button
+          type="button"
+          onClick={onOpenAddCard}
+          style={{
+            padding: '12px 28px',
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
+            color: '#ffffff',
+            fontWeight: 700,
+            fontSize: '14px',
+            border: 'none',
+            cursor: 'pointer',
+            boxShadow: '0 0 25px rgba(56, 189, 248, 0.4)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <CreditCardOutlined /> + Thêm Thẻ Đầu Tiên Ngay
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
@@ -173,7 +218,27 @@ export function OverviewTab({
                   )}
 
                   <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, marginBottom: '4px' }}>{card.bankName}</div>
-                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#ffffff', marginBottom: '12px' }}>{card.nickname}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 800, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.nickname}</div>
+                    <span
+                      style={{
+                        fontSize: '10px',
+                        color: '#38bdf8',
+                        background: 'rgba(56, 189, 248, 0.1)',
+                        border: '1px solid rgba(56, 189, 248, 0.2)',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        fontWeight: 700,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <span>{card.purposeIcon || '💳'}</span>
+                      <span>{card.purposeLabel || 'Đa năng'}</span>
+                    </span>
+                  </div>
                   <div style={{ fontSize: '12px', color: '#cbd5e1', letterSpacing: '2px', fontWeight: 700, marginBottom: '8px' }}>•••• {card.lastFourDigits}</div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
                     <span style={{ color: card.isLocked ? '#fca5a5' : '#4ade80', fontWeight: 700 }}>{card.isLocked ? '🔒 ĐÃ KHÓA' : '⚡ HOẠT ĐỘNG'}</span>
@@ -190,7 +255,26 @@ export function OverviewTab({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <div style={{ textAlign: 'left' }}>
               <span style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 700 }}>ĐANG CHỌN THẺ CÁ NHÂN</span>
-              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#ffffff' }}>{activeCard.nickname}</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '2px', flexWrap: 'wrap' }}>
+                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#ffffff' }}>{activeCard.nickname}</h2>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '3px 10px',
+                    borderRadius: '8px',
+                    background: 'rgba(56, 189, 248, 0.15)',
+                    border: '1px solid rgba(56, 189, 248, 0.3)',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    color: '#38bdf8',
+                  }}
+                >
+                  <span>{activeCard.purposeIcon || '💳'}</span>
+                  <span>{activeCard.purposeLabel || 'Chi tiêu chung'}</span>
+                </span>
+              </div>
             </div>
 
             {onDeleteCard && (
@@ -239,6 +323,8 @@ export function OverviewTab({
               cardType={activeCard.cardType}
               nfcId={activeCard.nfcId}
               bankName={activeCard.bankName}
+              purposeLabel={activeCard.purposeLabel}
+              purposeIcon={activeCard.purposeIcon}
             />
           </div>
 

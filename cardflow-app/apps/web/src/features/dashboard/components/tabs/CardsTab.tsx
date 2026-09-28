@@ -17,6 +17,7 @@ import {
 } from '@ant-design/icons';
 import type { CardDataModel, CardsViewMode } from '../../types';
 import type { CardTheme } from '@/app/_components/PersonalCard3D';
+import { CARD_PURPOSE_OPTIONS } from '@/app/_components/AddCardModal';
 
 interface CardsTabProps {
   cards: CardDataModel[];
@@ -73,6 +74,10 @@ export function CardsTab({
     internationalPayment: boolean;
     atmWithdrawal: boolean;
     notificationsEnabled: boolean;
+    purpose: string;
+    purposeLabel: string;
+    purposeIcon: string;
+    customPurposeLabel: string;
   }>({
     nickname: '',
     holderName: '',
@@ -83,10 +88,16 @@ export function CardsTab({
     internationalPayment: true,
     atmWithdrawal: true,
     notificationsEnabled: true,
+    purpose: 'general',
+    purposeLabel: 'Chi tiêu chung',
+    purposeIcon: '💳',
+    customPurposeLabel: '',
   });
 
   const handleOpenEditModal = (card: CardDataModel) => {
     setEditingCard(card);
+    const initialPurpose = card.purpose || 'general';
+    const isCustom = initialPurpose === 'custom';
     setEditForm({
       nickname: card.nickname || '',
       holderName: card.holderName || '',
@@ -97,11 +108,23 @@ export function CardsTab({
       internationalPayment: card.internationalPayment ?? true,
       atmWithdrawal: card.atmWithdrawal ?? true,
       notificationsEnabled: card.notificationsEnabled ?? true,
+      purpose: initialPurpose,
+      purposeLabel: card.purposeLabel || 'Chi tiêu chung',
+      purposeIcon: card.purposeIcon || '💳',
+      customPurposeLabel: isCustom ? (card.purposeLabel || '') : '',
     });
   };
 
   const handleSaveEdit = () => {
     if (!editingCard) return;
+    const currentMeta = CARD_PURPOSE_OPTIONS.find((p) => p.id === editForm.purpose);
+    const resolvedLabel = editForm.purpose === 'custom'
+      ? (editForm.customPurposeLabel.trim() || 'Tự chọn mục đích')
+      : (currentMeta?.label || editForm.purposeLabel || 'Chi tiêu chung');
+    const resolvedIcon = editForm.purpose === 'custom'
+      ? '✨'
+      : (currentMeta?.icon || editForm.purposeIcon || '💳');
+
     if (onUpdateCard) {
       onUpdateCard(editingCard.id, {
         nickname: editForm.nickname.trim() || editingCard.nickname,
@@ -113,6 +136,9 @@ export function CardsTab({
         internationalPayment: editForm.internationalPayment,
         atmWithdrawal: editForm.atmWithdrawal,
         notificationsEnabled: editForm.notificationsEnabled,
+        purpose: editForm.purpose,
+        purposeLabel: resolvedLabel,
+        purposeIcon: resolvedIcon,
       });
     }
     setEditingCard(null);
@@ -478,10 +504,48 @@ export function CardsTab({
         </div>
       )}
 
-      {/* DẠNG 1: LƯỚI (GRID VIEW) */}
-      {cardsViewMode === 'grid' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-          {cards.map((card) => {
+      {cards.length === 0 ? (
+        <div
+          style={{
+            textAlign: 'center',
+            padding: '60px 24px',
+            background: 'rgba(15, 23, 42, 0.45)',
+            border: '1px dashed rgba(56, 189, 248, 0.25)',
+            borderRadius: '24px',
+            backdropFilter: 'blur(12px)',
+          }}
+        >
+          <div style={{ fontSize: '48px', marginBottom: '14px' }}>💳</div>
+          <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#ffffff', marginBottom: '8px' }}>
+            Chưa Có Thẻ Cá Nhân Nào
+          </h3>
+          <p style={{ color: '#94a3b8', fontSize: '13px', maxWidth: '440px', margin: '0 auto 20px auto', lineHeight: 1.6 }}>
+            Bắt đầu bằng cách thêm thẻ ngân hàng đầu tiên của bạn để thiết lập hạn mức ngày và bảo mật mã PIN.
+          </p>
+          <button
+            type="button"
+            onClick={onOpenAddCard}
+            style={{
+              padding: '10px 24px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
+              color: '#ffffff',
+              fontWeight: 700,
+              fontSize: '13px',
+              border: 'none',
+              cursor: 'pointer',
+              boxShadow: '0 0 20px rgba(56, 189, 248, 0.35)',
+            }}
+          >
+            + Thêm Thẻ Mới
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* DẠNG 1: LƯỚI (GRID VIEW) */}
+          {cardsViewMode === 'grid' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+              {cards.map((card) => {
             const isSelected = card.id === activeCardId;
             const isCardChecked = selectedCardIds.includes(card.id);
             return (
@@ -544,8 +608,27 @@ export function CardsTab({
                 )}
 
                 <div>
-                  <div style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 700, marginBottom: '4px' }}>{card.bankName}</div>
-                  <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', fontWeight: 800, color: '#ffffff' }}>{card.nickname}</h3>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 700 }}>{card.bankName}</span>
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        background: 'rgba(56, 189, 248, 0.12)',
+                        border: '1px solid rgba(56, 189, 248, 0.25)',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: '#38bdf8',
+                      }}
+                    >
+                      <span>{card.purposeIcon || '💳'}</span>
+                      <span>{card.purposeLabel || 'Chi tiêu chung'}</span>
+                    </span>
+                  </div>
+                  <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', fontWeight: 800, color: '#ffffff' }}>{card.nickname}</h3>
 
                   <div style={{ fontFamily: 'monospace', fontSize: '16px', fontWeight: 700, color: '#cbd5e1', letterSpacing: '2px', marginBottom: '16px' }}>
                     •••• •••• •••• {card.lastFourDigits}
@@ -756,7 +839,26 @@ export function CardsTab({
                                 </span>
                               )}
                             </div>
-                            <div style={{ fontSize: '12px', color: '#38bdf8' }}>{card.bankName}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                              <span style={{ fontSize: '12px', color: '#38bdf8' }}>{card.bankName}</span>
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  fontSize: '11px',
+                                  color: '#cbd5e1',
+                                  background: 'rgba(255, 255, 255, 0.06)',
+                                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                <span>{card.purposeIcon || '💳'}</span>
+                                <span>{card.purposeLabel || 'Chi tiêu chung'}</span>
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -951,8 +1053,25 @@ export function CardsTab({
                   </div>
 
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff' }}>{card.nickname}</span>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          background: 'rgba(56, 189, 248, 0.12)',
+                          border: '1px solid rgba(56, 189, 248, 0.25)',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          color: '#38bdf8',
+                        }}
+                      >
+                        <span>{card.purposeIcon || '💳'}</span>
+                        <span>{card.purposeLabel || 'Chi tiêu chung'}</span>
+                      </span>
                       {card.isDefault && (
                         <span style={{ background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 700 }}>
                           <StarOutlined /> MẶC ĐỊNH
@@ -1059,6 +1178,8 @@ export function CardsTab({
             );
           })}
         </div>
+      )}
+      </>
       )}
 
       {/* MODAL: CHỌN THẺ CẦN LƯU VÀO GOOGLE SHEET */}
@@ -1461,6 +1582,77 @@ export function CardsTab({
                     boxSizing: 'border-box',
                   }}
                 />
+              </div>
+
+              {/* Mục đích sử dụng chuyên biệt */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#cbd5e1', marginBottom: '8px' }}>
+                  PHÂN LOẠI MỤC ĐÍCH SỬ DỤNG (NGƯỜI DÙNG TỰ CHỌN)
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '8px' }}>
+                  {CARD_PURPOSE_OPTIONS.map((opt) => {
+                    const isSelected = editForm.purpose === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() =>
+                          setEditForm((prev) => ({
+                            ...prev,
+                            purpose: opt.id,
+                            purposeLabel: opt.label,
+                            purposeIcon: opt.icon,
+                          }))
+                        }
+                        style={{
+                          padding: '9px 12px',
+                          borderRadius: '10px',
+                          background: isSelected ? 'rgba(56, 189, 248, 0.18)' : 'rgba(30, 41, 59, 0.6)',
+                          border: isSelected ? '1.5px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.08)',
+                          color: isSelected ? '#38bdf8' : '#cbd5e1',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          fontSize: '12px',
+                          fontWeight: isSelected ? 700 : 500,
+                          textAlign: 'left',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <span style={{ fontSize: '16px' }}>{opt.icon}</span>
+                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {opt.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {editForm.purpose === 'custom' && (
+                  <input
+                    type="text"
+                    value={editForm.customPurposeLabel}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, customPurposeLabel: e.target.value }))}
+                    placeholder="Nhập mục đích riêng (VD: Chuyên mua sách, Tiền chợ, Quỹ học tập...)"
+                    maxLength={35}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderRadius: '10px',
+                      background: 'rgba(30, 41, 59, 0.7)',
+                      border: '1px solid rgba(56, 189, 248, 0.4)',
+                      color: '#ffffff',
+                      fontSize: '14px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      marginTop: '6px',
+                    }}
+                  />
+                )}
+                <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+                  💡 Gán mục đích giúp bạn phân biệt thẻ nào chuyên ăn uống, thẻ nào chuyên mua sắm, du lịch...
+                </div>
               </div>
 
               {/* Chủ thẻ & Ngân hàng */}

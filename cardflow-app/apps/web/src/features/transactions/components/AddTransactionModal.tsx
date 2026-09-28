@@ -19,6 +19,60 @@ interface AddTransactionModalProps {
   initialCategory?: TransactionItem['category'];
 }
 
+// Hàm đọc số tiền thành chữ tiếng Việt
+function numberToVietnameseText(amount: number): string {
+  if (!amount || amount <= 0) return '';
+  const digits = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
+
+  function readTriple(n: number, showZeroHundred: boolean): string {
+    const h = Math.floor(n / 100);
+    const t = Math.floor((n % 100) / 10);
+    const u = n % 10;
+    if (h === 0 && t === 0 && u === 0) return '';
+    let res = '';
+    if (h > 0 || showZeroHundred) {
+      res += `${digits[h]} trăm `;
+    }
+    if (t === 0 && u > 0 && (h > 0 || showZeroHundred)) {
+      res += 'lẻ ';
+    } else if (t === 1) {
+      res += 'mười ';
+    } else if (t > 1) {
+      res += `${digits[t]} mươi `;
+    }
+    if (t > 0 && u === 1 && t > 1) {
+      res += 'mốt ';
+    } else if (t > 0 && u === 5) {
+      res += 'lăm ';
+    } else if (u > 0) {
+      res += `${digits[u]} `;
+    }
+    return res.trim();
+  }
+
+  const scales = ['', 'nghìn', 'triệu', 'tỷ', 'nghìn tỷ'];
+  let temp = Math.floor(amount);
+  const parts: number[] = [];
+  while (temp > 0) {
+    parts.push(temp % 1000);
+    temp = Math.floor(temp / 1000);
+  }
+  if (parts.length === 0) return 'Không đồng';
+
+  let result = '';
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const part = parts[i];
+    if (part !== undefined && part > 0) {
+      const showZero = i < parts.length - 1;
+      const text = readTriple(part, showZero);
+      const scale = scales[i] ?? '';
+      result += `${text} ${scale} `;
+    }
+  }
+  result = result.trim() + ' đồng';
+  return result.charAt(0).toUpperCase() + result.slice(1);
+}
+
 export function AddTransactionModal({
   isOpen,
   onClose,
@@ -35,9 +89,47 @@ export function AddTransactionModal({
 
   if (!isOpen) return null;
 
+  // Lấy giá trị số nguyên từ chuỗi định dạng (ví dụ: '20.000.000 VNĐ' -> 20000000)
+  const currentNumericAmount = parseInt(txAmount.replace(/\D/g, ''), 10) || 0;
+
+  // Xử lý khi gõ bàn phím ô số tiền: tự động định dạng như 20.000.000 VNĐ
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, '');
+    if (!raw) {
+      setTxAmount('');
+      return;
+    }
+    const num = parseInt(raw, 10);
+    if (num > 100_000_000_000) return; // Giới hạn an toàn
+    setTxAmount(`${num.toLocaleString('vi-VN')} VNĐ`);
+  };
+
+  // Hỗ trợ xóa lùi từng chữ số khi người dùng bấm Backspace
+  const handleAmountKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace') {
+      const raw = txAmount.replace(/\D/g, '');
+      if (raw.length <= 1) {
+        setTxAmount('');
+        e.preventDefault();
+      } else {
+        const sliced = raw.slice(0, -1);
+        const num = parseInt(sliced, 10);
+        setTxAmount(`${num.toLocaleString('vi-VN')} VNĐ`);
+        e.preventDefault();
+      }
+    }
+  };
+
+  // Thêm nhanh số tiền định sẵn
+  const handleQuickAdd = (delta: number) => {
+    const next = currentNumericAmount + delta;
+    if (next > 100_000_000_000) return;
+    setTxAmount(`${next.toLocaleString('vi-VN')} VNĐ`);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const parsedAmount = parseInt(txAmount, 10);
+    const parsedAmount = parseInt(txAmount.replace(/\D/g, ''), 10);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       onToast('⚠️ Vui lòng nhập số tiền hợp lệ lớn hơn 0');
       return;
@@ -132,22 +224,159 @@ export function AddTransactionModal({
           </div>
 
           <div className={styles.formGroup}>
-            <label className={styles.formLabel}>Số tiền (VNĐ)</label>
-            <input
-              type="text"
-              placeholder="Ví dụ: 150000"
-              value={txAmount}
-              onChange={(e) => setTxAmount(e.target.value.replace(/\D/g, ''))}
-              className={styles.inputField}
-              required
-            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label className={styles.formLabel}>Số tiền (VNĐ)</label>
+              {currentNumericAmount > 0 && (
+                <span style={{ fontSize: '11px', color: '#38bdf8', fontWeight: 600 }}>
+                  Tự động định dạng: VNĐ
+                </span>
+              )}
+            </div>
+
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="20.000.000 VNĐ"
+                value={txAmount}
+                onChange={handleAmountChange}
+                onKeyDown={handleAmountKeyDown}
+                className={styles.inputField}
+                style={{
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  letterSpacing: '0.5px',
+                  color: txType === 'expense' ? '#f472b6' : '#34d399',
+                }}
+                required
+              />
+            </div>
+
+            {/* Đọc thành chữ tiếng Việt */}
+            {currentNumericAmount > 0 && (
+              <div
+                style={{
+                  fontSize: '12px',
+                  color: '#38bdf8',
+                  background: 'rgba(56, 189, 248, 0.1)',
+                  padding: '6px 10px',
+                  borderRadius: '8px',
+                  marginTop: '4px',
+                  border: '1px solid rgba(56, 189, 248, 0.2)',
+                  fontStyle: 'italic',
+                }}
+              >
+                💬 <strong>Bằng chữ:</strong> {numberToVietnameseText(currentNumericAmount)}
+              </div>
+            )}
+
+            {/* Phím tắt cộng nhanh số tiền */}
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+              <button
+                type="button"
+                onClick={() => handleQuickAdd(100000)}
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#cbd5e1',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                +100K
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickAdd(500000)}
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#cbd5e1',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                +500K
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickAdd(1000000)}
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#cbd5e1',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                +1.000.000
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickAdd(5000000)}
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#cbd5e1',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                +5.000.000
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickAdd(20000000)}
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  background: 'rgba(56, 189, 248, 0.15)',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  color: '#38bdf8',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                +20.000.000
+              </button>
+              {currentNumericAmount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setTxAmount('')}
+                  style={{
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    color: '#f87171',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Xóa
+                </button>
+              )}
+            </div>
           </div>
 
           <div className={styles.formGroup}>
             <label className={styles.formLabel}>Tên điểm bán / Nội dung</label>
             <input
               type="text"
-              placeholder="Ví dụ: Highlands Coffee Landmark"
+              placeholder="Highlands Coffee Landmark"
               value={txMerchant}
               onChange={(e) => setTxMerchant(e.target.value)}
               className={styles.inputField}
@@ -181,11 +410,15 @@ export function AddTransactionModal({
               className={styles.inputField}
               style={{ cursor: 'pointer' }}
             >
-              {cards.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.bankName} - {c.nickname} (•••• {c.lastFourDigits})
-                </option>
-              ))}
+              {cards.map((c) => {
+                const purposePrefix = c.purposeIcon ? `${c.purposeIcon} ` : '';
+                const purposeSuffix = c.purposeLabel ? ` [${c.purposeLabel}]` : '';
+                return (
+                  <option key={c.id} value={c.id}>
+                    {purposePrefix}{c.bankName} - {c.nickname}{purposeSuffix} (•••• {c.lastFourDigits})
+                  </option>
+                );
+              })}
             </select>
           </div>
 

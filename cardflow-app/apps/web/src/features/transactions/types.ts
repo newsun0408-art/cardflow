@@ -37,4 +37,6 @@ export interface TransactionExpenseManagerProps {
   onOpenExportReport: () => void;
   onOpenImportSheet?: () => void;
   onToast: (msg: string) => void;
+  activeTab?: 'transactions' | 'stats';
+  onSelectTransaction?: (tx: TransactionItem) => void;
 }

@@ -49,6 +49,8 @@ export default function FullscreenDashboard() {
     setIsExportReportOpen,
     isImportSheetOpen,
     setIsImportSheetOpen,
+    isGuideModalOpen,
+    setIsGuideModalOpen,
     handleImportTransactionsSuccess,
     toastMessage,
     showToast,
@@ -154,6 +156,7 @@ export default function FullscreenDashboard() {
           isBalanceHidden={isBalanceHidden}
           onToggleHideBalance={handleToggleHideBalance}
           onOpenAddCard={() => setIsAddCardOpen(true)}
+          onOpenGuideModal={() => setIsGuideModalOpen(true)}
           userProfile={userProfile}
           getUserInitials={getUserInitials}
         />
@@ -228,6 +231,8 @@ export default function FullscreenDashboard() {
               onOpenExportReport={() => setIsExportReportOpen(true)}
               onOpenImportSheet={() => setIsImportSheetOpen(true)}
               onToast={showToast}
+              activeTab={activeTab === 'stats' ? 'stats' : 'transactions'}
+              onSelectTransaction={(tx) => setSelectedTxDetail(tx)}
             />
           )}
 
@@ -256,6 +261,7 @@ export default function FullscreenDashboard() {
         activeCard={activeCard}
         onCloseLimitModal={() => setIsLimitModalOpen(false)}
         onSaveLimit={(newLimit) => {
+          if (!activeCard) return;
           setCards((prev) =>
             prev.map((c) => (c.id === activeCard.id ? { ...c, dailyLimit: newLimit } : c))
           );
@@ -269,6 +275,7 @@ export default function FullscreenDashboard() {
         onToggleLock={handleToggleLock}
         onRequestToggleSensitive={handleRequestToggleSensitive}
         onThemeChange={(newTheme) => {
+          if (!activeCard) return;
           setCards((prev) =>
             prev.map((c) => (c.id === activeCard.id ? { ...c, theme: newTheme } : c))
           );
@@ -292,6 +299,8 @@ export default function FullscreenDashboard() {
         onImportSuccess={handleImportTransactionsSuccess}
         cards={cards}
         onToast={showToast}
+        isGuideModalOpen={isGuideModalOpen}
+        onCloseGuideModal={() => setIsGuideModalOpen(false)}
       />
     </div>
   );

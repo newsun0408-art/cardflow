@@ -22,7 +22,7 @@ import { deleteGoogleDriveFileAction } from '@/app/actions/google-integration';
 export const INITIAL_CARDS: CardDataModel[] = [
   {
     id: 'card-1',
-    nickname: 'Thẻ Chính Platinum',
+    nickname: 'Thẻ Công Nghệ & Tiện Ích',
     bankName: 'Cardflow Bank',
     cardType: 'VISA PLATINUM',
     lastFourDigits: '9921',
@@ -41,10 +41,13 @@ export const INITIAL_CARDS: CardDataModel[] = [
     internationalPayment: true,
     atmWithdrawal: true,
     notificationsEnabled: true,
+    purpose: 'tech',
+    purposeLabel: 'Chuyên Công nghệ & Thiết bị',
+    purposeIcon: '💻',
   },
   {
     id: 'card-2',
-    nickname: 'Thẻ Phụ Gold VIP',
+    nickname: 'Thẻ Ăn Uống & Cafe',
     bankName: 'Techcombank',
     cardType: 'VISA GOLD',
     lastFourDigits: '4412',
@@ -63,10 +66,13 @@ export const INITIAL_CARDS: CardDataModel[] = [
     internationalPayment: false,
     atmWithdrawal: true,
     notificationsEnabled: true,
+    purpose: 'dining',
+    purposeLabel: 'Chuyên Ăn uống & Cà phê',
+    purposeIcon: '🍔',
   },
   {
     id: 'card-3',
-    nickname: 'Thẻ Thanh Toán Deep Sapphire',
+    nickname: 'Thẻ Mua Sắm & Shopping',
     bankName: 'Vietcombank',
     cardType: 'MASTERCARD BLACK',
     lastFourDigits: '8834',
@@ -85,6 +91,9 @@ export const INITIAL_CARDS: CardDataModel[] = [
     internationalPayment: false,
     atmWithdrawal: false,
     notificationsEnabled: false,
+    purpose: 'shopping',
+    purposeLabel: 'Chuyên Mua sắm & Shopping',
+    purposeIcon: '🛍️',
   },
 ];
 
@@ -129,6 +138,8 @@ export function useDashboardState() {
   const [selectedTxDetail, setSelectedTxDetail] = useState<TransactionItem | null>(null);
   const [isExportReportOpen, setIsExportReportOpen] = useState(false);
   const [isImportSheetOpen, setIsImportSheetOpen] = useState(false);
+  const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
+  const [isStorageLoaded, setIsStorageLoaded] = useState(false);
 
   // Google Drive & Sheets Sync
   const [isSyncingToSheet, setIsSyncingToSheet] = useState(false);
@@ -180,25 +191,91 @@ export function useDashboardState() {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  // Sync profile and view mode from localStorage
+  // Sync profile, view mode, cards, and transactions from localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem('cardflow_user_profile');
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (parsed && parsed.fullName) setUserProfile(parsed);
+          if (parsed && parsed.fullName) {
+            setUserProfile((prev) => ({
+              ...DEFAULT_USER_PROFILE,
+              ...prev,
+              ...parsed,
+              nickname: parsed.nickname || prev.nickname || (parsed.fullName ? parsed.fullName.toLowerCase().replace(/\s+/g, '_') : 'user'),
+              phone: parsed.phone || prev.phone || '',
+            }));
+          }
         }
 
         const savedView = localStorage.getItem('cardflow_cards_view_mode') as CardsViewMode | null;
         if (savedView && ['grid', 'table', 'list'].includes(savedView)) {
           setCardsViewMode(savedView);
         }
+
+        const userId = localStorage.getItem('cardflow_user_id') || 'guest';
+        const isNewUser = localStorage.getItem('cardflow_is_new_user') === 'true';
+
+        if (isNewUser) {
+          // Tài khoản mới tạo: Bắt đầu hoàn toàn trống để người dùng tự thêm thẻ
+          setCards([]);
+          setTransactions([]);
+          setActiveCardId('');
+          setIsStorageLoaded(true);
+          return;
+        }
+
+        const cardsKey = `cardflow_cards_${userId}`;
+        const txsKey = `cardflow_txs_${userId}`;
+        const savedCards = localStorage.getItem(cardsKey);
+        const savedTxs = localStorage.getItem(txsKey);
+
+        if (savedCards !== null) {
+          const parsedCards = JSON.parse(savedCards);
+          if (Array.isArray(parsedCards)) {
+            setCards(parsedCards);
+            if (parsedCards.length > 0) {
+              setActiveCardId(parsedCards[0].id);
+            } else {
+              setActiveCardId('');
+            }
+          }
+        }
+
+        if (savedTxs !== null) {
+          const parsedTxs = JSON.parse(savedTxs);
+          if (Array.isArray(parsedTxs)) {
+            setTransactions(parsedTxs);
+          }
+        }
       } catch {
         // Ignore
       }
+      setIsStorageLoaded(true);
     }
   }, []);
+
+  // Save cards to localStorage whenever cards change
+  useEffect(() => {
+    if (typeof window === 'undefined' || !isStorageLoaded) return;
+    try {
+      const userId = localStorage.getItem('cardflow_user_id') || 'guest';
+      localStorage.setItem(`cardflow_cards_${userId}`, JSON.stringify(cards));
+      if (cards.length > 0) {
+        localStorage.removeItem('cardflow_is_new_user');
+      }
+    } catch {}
+  }, [cards, isStorageLoaded]);
+
+  // Save transactions to localStorage whenever transactions change
+  useEffect(() => {
+    if (typeof window === 'undefined' || !isStorageLoaded) return;
+    try {
+      const userId = localStorage.getItem('cardflow_user_id') || 'guest';
+      localStorage.setItem(`cardflow_txs_${userId}`, JSON.stringify(transactions));
+    } catch {}
+  }, [transactions, isStorageLoaded]);
 
   // Backend Connection Status
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'offline'>('checking');
@@ -206,6 +283,10 @@ export function useDashboardState() {
   // Sync with Go backend
   useEffect(() => {
     try {
+      if (typeof window !== 'undefined' && localStorage.getItem('cardflow_is_new_user') === 'true') {
+        setBackendStatus('connected');
+        return;
+      }
       const api = createApi();
       getCards(api)
         .then((res: any) => {
@@ -235,6 +316,9 @@ export function useDashboardState() {
               atmWithdrawal: true,
               notificationsEnabled: true,
               createdAt: '2026-09-01',
+              purpose: idx % 2 === 0 ? 'tech' : 'dining',
+              purposeLabel: idx % 2 === 0 ? 'Chuyên Công nghệ & Thiết bị' : 'Chuyên Ăn uống & Cà phê',
+              purposeIcon: idx % 2 === 0 ? '💻' : '🍔',
             }));
             setCards(liveCards);
             setActiveCardId(liveCards[0]?.id ?? 'card-1');
@@ -308,7 +392,7 @@ export function useDashboardState() {
     return () => clearInterval(timer);
   }, [showSensitiveData, sensitiveCountdown]);
 
-  const activeCard: CardDataModel = (cards.find((c) => c.id === activeCardId) || cards[0] || INITIAL_CARDS[0])!;
+  const activeCard: CardDataModel = (cards.find((c) => c.id === activeCardId) || cards[0] || (cards.length > 0 ? cards[0] : null)) as any;
 
   const handleCardsViewModeChange = (mode: CardsViewMode) => {
     setCardsViewMode(mode);
@@ -744,6 +828,8 @@ export function useDashboardState() {
     setIsExportReportOpen,
     isImportSheetOpen,
     setIsImportSheetOpen,
+    isGuideModalOpen,
+    setIsGuideModalOpen,
     handleImportTransactionsSuccess,
     toastMessage,
     showToast,

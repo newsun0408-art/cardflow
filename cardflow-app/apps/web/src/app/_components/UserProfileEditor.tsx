@@ -27,11 +27,11 @@ export interface UserProfileEditorProps {
 
 export function UserProfileEditor({ initialProfile, onSaveSuccess }: UserProfileEditorProps) {
   const [profile, setProfile] = useState<UserProfile>(initialProfile);
-  const [fullName, setFullName] = useState(initialProfile.fullName);
-  const [nickname, setNickname] = useState(initialProfile.nickname);
-  const [phone, setPhone] = useState(initialProfile.phone);
-  const [bio, setBio] = useState(initialProfile.bio ?? '');
-  const [avatarUrl, setAvatarUrl] = useState<string>(initialProfile.avatarUrl ?? '');
+  const [fullName, setFullName] = useState(initialProfile?.fullName || '');
+  const [nickname, setNickname] = useState(initialProfile?.nickname || '');
+  const [phone, setPhone] = useState(initialProfile?.phone || '');
+  const [bio, setBio] = useState(initialProfile?.bio ?? '');
+  const [avatarUrl, setAvatarUrl] = useState<string>(initialProfile?.avatarUrl ?? '');
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -41,25 +41,27 @@ export function UserProfileEditor({ initialProfile, onSaveSuccess }: UserProfile
 
   // Sync state when initialProfile changes from outside
   useEffect(() => {
-    setProfile(initialProfile);
-    setFullName(initialProfile.fullName);
-    setNickname(initialProfile.nickname);
-    setPhone(initialProfile.phone);
-    setBio(initialProfile.bio ?? '');
-    setAvatarUrl(initialProfile.avatarUrl ?? '');
+    if (initialProfile) {
+      setProfile(initialProfile);
+      setFullName(initialProfile.fullName || '');
+      setNickname(initialProfile.nickname || '');
+      setPhone(initialProfile.phone || '');
+      setBio(initialProfile.bio ?? '');
+      setAvatarUrl(initialProfile.avatarUrl ?? '');
+    }
   }, [initialProfile]);
 
   // Kiểm tra có thay đổi dữ liệu so với profile hiện tại không
   const isChanged =
-    fullName.trim() !== profile.fullName ||
-    nickname.trim().replace(/^@/, '') !== profile.nickname ||
-    phone.trim().replace(/[\s.-]/g, '') !== profile.phone.replace(/[\s.-]/g, '') ||
-    bio.trim() !== (profile.bio ?? '') ||
-    avatarUrl !== (profile.avatarUrl ?? '');
+    (fullName || '').trim() !== (profile?.fullName || '') ||
+    (nickname || '').trim().replace(/^@/, '') !== (profile?.nickname || '') ||
+    (phone || '').trim().replace(/[\s.-]/g, '') !== (profile?.phone || '').replace(/[\s.-]/g, '') ||
+    (bio || '').trim() !== (profile?.bio ?? '') ||
+    (avatarUrl || '') !== (profile?.avatarUrl ?? '');
 
   // Lấy ký tự đại diện (Initials) khi không có ảnh
-  const getInitials = (name: string) => {
-    const parts = name.trim().split(/\s+/).filter(Boolean);
+  const getInitials = (name: string = '') => {
+    const parts = (name || '').trim().split(/\s+/).filter(Boolean);
     if (parts.length >= 2) {
       const first = parts[parts.length - 2]?.[0] ?? '';
       const second = parts[parts.length - 1]?.[0] ?? '';
@@ -90,14 +92,47 @@ export function UserProfileEditor({ initialProfile, onSaveSuccess }: UserProfile
       return;
     }
 
-    // 3. Đọc ảnh thành base64 data url để preview ngay lập tức
+    // 3. Đọc ảnh và tự động nén qua Canvas để tối ưu kích thước và không bị quá tải bộ nhớ
     const reader = new FileReader();
     reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (result) {
-        setAvatarUrl(result);
-        setSuccessMessage('Đã chọn ảnh thành công! Nhấn "Lưu thay đổi" để áp dụng ảnh đại diện mới.');
-      }
+      const rawData = event.target?.result as string;
+      if (!rawData) return;
+
+      const img = new Image();
+      img.onload = () => {
+        const MAX_DIM = 320;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > MAX_DIM) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          }
+        } else {
+          if (height > MAX_DIM) {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedData = canvas.toDataURL('image/jpeg', 0.85);
+          setAvatarUrl(compressedData);
+          setSuccessMessage('Đã tải và tối ưu ảnh thành công! Nhấn "Lưu thay đổi" để áp dụng.');
+        } else {
+          setAvatarUrl(rawData);
+          setSuccessMessage('Đã chọn ảnh thành công! Nhấn "Lưu thay đổi" để áp dụng ảnh đại diện mới.');
+        }
+      };
+      img.onerror = () => {
+        setAvatarUrl(rawData);
+        setSuccessMessage('Đã chọn ảnh thành công! Nhấn "Lưu thay đổi" để áp dụng.');
+      };
+      img.src = rawData;
     };
     reader.onerror = () => {
       setErrorMessage('Đã xảy ra lỗi khi đọc tệp hình ảnh từ thiết bị của bạn.');
@@ -117,11 +152,11 @@ export function UserProfileEditor({ initialProfile, onSaveSuccess }: UserProfile
 
   // Khôi phục về thông tin ban đầu
   const handleReset = () => {
-    setFullName(profile.fullName);
-    setNickname(profile.nickname);
-    setPhone(profile.phone);
-    setBio(profile.bio ?? '');
-    setAvatarUrl(profile.avatarUrl ?? '');
+    setFullName(profile?.fullName || '');
+    setNickname(profile?.nickname || '');
+    setPhone(profile?.phone || '');
+    setBio(profile?.bio ?? '');
+    setAvatarUrl(profile?.avatarUrl ?? '');
     setErrorMessage(null);
     setSuccessMessage(null);
   };
@@ -149,9 +184,9 @@ export function UserProfileEditor({ initialProfile, onSaveSuccess }: UserProfile
 
         // Cập nhật thành công
         setProfile(result.profile);
-        setFullName(result.profile.fullName);
-        setNickname(result.profile.nickname);
-        setPhone(result.profile.phone);
+        setFullName(result.profile.fullName || '');
+        setNickname(result.profile.nickname || '');
+        setPhone(result.profile.phone || '');
         setBio(result.profile.bio ?? '');
         setAvatarUrl(result.profile.avatarUrl ?? '');
         setSuccessMessage('🎉 Đã cập nhật thông tin cá nhân thành công!');

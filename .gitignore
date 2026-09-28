@@ -38,6 +38,9 @@ drive_store.json
 **/.git_backup/
 **/.mcp.json
 .mcp.json
+storage/
+**/storage/
+*.json.bak
 
 # OS files
 .DS_Store

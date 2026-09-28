@@ -40,7 +40,30 @@ export interface CardDataModel {
   atmWithdrawal: boolean;
   notificationsEnabled: boolean;
   syncToSheet?: boolean;
+  createdAt?: string;
+  purpose?: string;
+  purposeLabel?: string;
+  purposeIcon?: string;
 }
+
+export interface CardPurposeOption {
+  id: string;
+  label: string;
+  shortLabel: string;
+  icon: string;
+  color: string;
+}
+
+export const CARD_PURPOSE_OPTIONS: CardPurposeOption[] = [
+  { id: 'dining',     label: 'Chuyên Ăn uống & Cà phê',   shortLabel: 'Ăn uống',   icon: '🍔', color: '#f59e0b' },
+  { id: 'shopping',   label: 'Chuyên Mua sắm & Shopping', shortLabel: 'Mua sắm',   icon: '🛍️', color: '#ec4899' },
+  { id: 'travel',     label: 'Chuyên Du lịch & Di chuyển',shortLabel: 'Du lịch',   icon: '✈️', color: '#38bdf8' },
+  { id: 'tech',       label: 'Chuyên Công nghệ & Thiết bị',shortLabel: 'Công nghệ', icon: '💻', color: '#6366f1' },
+  { id: 'bills',      label: 'Chuyên Hóa đơn & Sinh hoạt',shortLabel: 'Sinh hoạt', icon: '🏠', color: '#10b981' },
+  { id: 'investment', label: 'Chuyên Đầu tư & Tích lũy',  shortLabel: 'Đầu tư',    icon: '📈', color: '#8b5cf6' },
+  { id: 'general',    label: 'Chi tiêu Đa năng / Dùng chung', shortLabel: 'Đa năng', icon: '💳', color: '#94a3b8' },
+  { id: 'custom',     label: 'Tự đặt mục đích riêng...',  shortLabel: 'Tự chọn',   icon: '✨', color: '#38bdf8' },
+];
 
 type CardNetwork = 'VISA' | 'MASTERCARD' | 'JCB' | 'AMEX' | 'NAPAS' | 'UNKNOWN';
 
@@ -148,12 +171,20 @@ export function AddCardModal({ isOpen, onClose, onAddCard }: AddCardModalProps) 
   const [theme, setTheme]       = useState<CardTheme>('dark-cyber');
   const [isDefault, setDefault] = useState(false);
   const [syncToSheet, setSyncToSheet] = useState(true);
+  const [purpose, setPurpose]   = useState<string>('dining');
+  const [customPurposeLabel, setCustomLabel] = useState<string>('');
 
   const rawPan    = pan.replace(/\s/g, '');
   const network   = detectNetwork(rawPan);
   const cvvLength = network === 'AMEX' ? 4 : 3;
   const isLuhnOk  = rawPan.length >= 13 && luhnCheck(rawPan);
   const netMeta   = NETWORK_META[network];
+
+  const selectedPurposeMeta = CARD_PURPOSE_OPTIONS.find((p) => p.id === purpose);
+  const effectivePurposeLabel = purpose === 'custom'
+    ? (customPurposeLabel.trim() || 'Tự chọn mục đích')
+    : (selectedPurposeMeta?.label || 'Chi tiêu chung');
+  const effectivePurposeIcon = purpose === 'custom' ? '✨' : (selectedPurposeMeta?.icon || '💳');
 
   const step0Valid = rawPan.length >= 13 && isLuhnOk && holderName.trim().length >= 2;
   const step1Valid = isIntl
@@ -183,10 +214,14 @@ export function AddCardModal({ isOpen, onClose, onAddCard }: AddCardModalProps) 
       onlinePayment: true, internationalPayment: isIntl,
       atmWithdrawal: true, notificationsEnabled: true,
       syncToSheet,
+      purpose,
+      purposeLabel: effectivePurposeLabel,
+      purposeIcon: effectivePurposeIcon,
     });
     setPan(''); setHolder(''); setBank('Vietcombank'); setType('VISA PLATINUM');
     setExpiry(''); setIssue(''); setCvv(''); setNickname('');
-    setTheme('dark-cyber'); setDefault(false); setIsIntl(true); setSyncToSheet(true); setStep(0);
+    setTheme('dark-cyber'); setDefault(false); setIsIntl(true); setSyncToSheet(true);
+    setPurpose('dining'); setCustomLabel(''); setStep(0);
     onClose();
   };
 
@@ -394,6 +429,57 @@ export function AddCardModal({ isOpen, onClose, onAddCard }: AddCardModalProps) 
                   style={inputStyle()}
                 />
               </div>
+
+              {/* Phân loại mục đích chuyên dùng của thẻ */}
+              <div>
+                <label style={labelStyle}>
+                  Mục đích sử dụng thẻ (Người dùng tự chọn) <span style={{color:'#38bdf8'}}>*</span>
+                </label>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(2, 1fr)',gap:'8px',marginBottom:'8px'}}>
+                  {CARD_PURPOSE_OPTIONS.map(opt => {
+                    const isSelected = purpose === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setPurpose(opt.id)}
+                        style={{
+                          padding:'8px 10px',
+                          borderRadius:'10px',
+                          background: isSelected ? 'rgba(56,189,248,0.18)' : 'rgba(255,255,255,0.04)',
+                          border: isSelected ? '1.5px solid #38bdf8' : '1px solid rgba(255,255,255,0.08)',
+                          color: isSelected ? '#38bdf8' : '#cbd5e1',
+                          cursor:'pointer',
+                          display:'flex',
+                          alignItems:'center',
+                          gap:'8px',
+                          fontSize:'12px',
+                          fontWeight: isSelected ? 700 : 500,
+                          textAlign:'left',
+                          transition:'all 0.15s ease',
+                        }}
+                      >
+                        <span style={{fontSize:'16px'}}>{opt.icon}</span>
+                        <span style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{opt.shortLabel}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {purpose === 'custom' && (
+                  <input
+                    type="text"
+                    placeholder="Nhập mục đích riêng (VD: Chuyên mua sách, Tiền chợ, Quỹ học tập...)"
+                    value={customPurposeLabel}
+                    onChange={e => setCustomLabel(e.target.value)}
+                    maxLength={35}
+                    style={{...inputStyle(),marginTop:'6px'}}
+                  />
+                )}
+                <div style={{fontSize:'11px',color:'#64748b',marginTop:'4px'}}>
+                  💡 Thẻ này sẽ được gắn nhãn chuyên biệt: <strong>{effectivePurposeIcon} {effectivePurposeLabel}</strong>
+                </div>
+              </div>
             </div>
           )}
 
@@ -437,6 +523,7 @@ export function AddCardModal({ isOpen, onClose, onAddCard }: AddCardModalProps) 
                 isIntl ? ['Ngày hết hạn', expiry] : ['Ngày phát hành', issueDate],
                 isIntl ? ['CVV/CVC', '•'.repeat(cvvLength)] : null,
                 ['Tên gợi nhớ', nickname],
+                ['Chuyên dùng', `${effectivePurposeIcon} ${effectivePurposeLabel}`],
                 ['Giao diện', THEME_OPTIONS.find(t=>t.id===theme)?.label ?? theme],
                 ['Thẻ mặc định', isDefault ? 'Có' : 'Không'],
               ] as ([string,string]|null)[]).filter((x): x is [string, string] => Boolean(x)).map(([k,v]) => (

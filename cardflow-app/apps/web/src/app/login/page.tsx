@@ -191,6 +191,10 @@ export default function LoginPage() {
             email: data.user.email,
             phone: data.user.phone || '',
           }));
+          // Đánh dấu tài khoản mới tạo: Bắt đầu với danh sách thẻ trống để người dùng tự thêm
+          localStorage.setItem('cardflow_is_new_user', 'true');
+          localStorage.setItem(`cardflow_cards_${data.user.id}`, JSON.stringify([]));
+          localStorage.setItem(`cardflow_txs_${data.user.id}`, JSON.stringify([]));
         } catch {}
       }
 
@@ -395,6 +399,7 @@ export default function LoginPage() {
             email: data.user.email,
             phone: data.user.phone || '',
           }));
+          localStorage.removeItem('cardflow_is_new_user');
         } catch {}
       }
 

@@ -39,4 +39,6 @@ export interface TransactionExpenseManagerProps {
   onToast: (msg: string) => void;
   activeTab?: 'transactions' | 'stats';
   onSelectTransaction?: (tx: TransactionItem) => void;
+  onEditTransaction?: (tx: TransactionItem) => void;
+  onDeleteTransaction?: (tx: TransactionItem) => void;
 }

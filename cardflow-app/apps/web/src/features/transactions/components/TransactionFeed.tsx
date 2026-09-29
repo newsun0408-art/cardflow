@@ -15,6 +15,8 @@ import {
   FieldTimeOutlined,
   PlusOutlined,
   FileExcelOutlined,
+  EditOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import type { CardDataModel } from '@/app/_components/AddCardModal';
 import type { TransactionItem } from '../types';
@@ -43,6 +45,8 @@ interface TransactionFeedProps {
   onOpenExportReport?: () => void;
   onOpenImportSheet?: () => void;
   onSelectTransaction?: (tx: TransactionItem) => void;
+  onEditTransaction?: (tx: TransactionItem) => void;
+  onDeleteTransaction?: (tx: TransactionItem) => void;
 }
 
 export function TransactionFeed({
@@ -68,6 +72,8 @@ export function TransactionFeed({
   onOpenExportReport,
   onOpenImportSheet: _onOpenImportSheet,
   onSelectTransaction,
+  onEditTransaction,
+  onDeleteTransaction,
 }: TransactionFeedProps) {
   const formatDateDisplay = (dateStr: string) => {
     if (!dateStr) return '';
@@ -371,21 +377,108 @@ export function TransactionFeed({
               </div>
             </div>
 
-            <div style={{ textAlign: 'right' }}>
-              <div
-                style={{
-                  fontSize: '15px',
-                  fontWeight: 800,
-                  color: tx.type === 'expense' ? '#f472b6' : '#34d399',
-                }}
-              >
-                {isBalanceHidden
-                  ? '•••••••• ₫'
-                  : `${tx.amount > 0 ? '+' : ''}${tx.amount.toLocaleString('vi-VN')} ₫`}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ textAlign: 'right' }}>
+                <div
+                  style={{
+                    fontSize: '15px',
+                    fontWeight: 800,
+                    color: tx.type === 'expense' ? '#f472b6' : '#34d399',
+                  }}
+                >
+                  {isBalanceHidden
+                    ? '•••••••• ₫'
+                    : `${tx.amount > 0 ? '+' : ''}${tx.amount.toLocaleString('vi-VN')} ₫`}
+                </div>
+                <div style={{ fontSize: '11px', color: '#10b981', marginTop: '2px' }}>
+                  {tx.status}
+                </div>
               </div>
-              <div style={{ fontSize: '11px', color: '#10b981', marginTop: '2px' }}>
-                {tx.status}
-              </div>
+
+              {(onEditTransaction || onDeleteTransaction) && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    paddingLeft: '10px',
+                    borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {onEditTransaction && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditTransaction(tx);
+                      }}
+                      style={{
+                        background: 'rgba(56, 189, 248, 0.1)',
+                        border: '1px solid rgba(56, 189, 248, 0.25)',
+                        color: '#38bdf8',
+                        borderRadius: '8px',
+                        width: '32px',
+                        height: '32px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(56, 189, 248, 0.25)';
+                        e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.6)';
+                        e.currentTarget.style.transform = 'scale(1.08)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(56, 189, 248, 0.1)';
+                        e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.25)';
+                        e.currentTarget.style.transform = 'scale(1)';
+                      }}
+                      title="Chỉnh sửa thông tin giao dịch"
+                    >
+                      <EditOutlined style={{ fontSize: '13px' }} />
+                    </button>
+                  )}
+
+                  {onDeleteTransaction && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteTransaction(tx);
+                      }}
+                      style={{
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.25)',
+                        color: '#f87171',
+                        borderRadius: '8px',
+                        width: '32px',
+                        height: '32px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)';
+                        e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.6)';
+                        e.currentTarget.style.transform = 'scale(1.08)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                        e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.25)';
+                        e.currentTarget.style.transform = 'scale(1)';
+                      }}
+                      title="Xóa giao dịch này"
+                    >
+                      <DeleteOutlined style={{ fontSize: '13px' }} />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         ))}

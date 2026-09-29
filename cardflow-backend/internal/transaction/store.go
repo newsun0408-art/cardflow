@@ -62,6 +62,34 @@ func (s *Store) Create(ctx context.Context, tx Transaction) error {
 	return nil
 }
 
+func (s *Store) GetByID(ctx context.Context, userID string, id string) (*Transaction, error) {
+	query := "SELECT id, card_id, user_id, title, amount, type, category, status, COALESCE(note, ''), created_at, updated_at FROM transactions WHERE id=$1 AND user_id=$2"
+	var t Transaction
+	err := s.pool.QueryRow(ctx, query, id, userID).Scan(&t.ID, &t.CardID, &t.UserID, &t.Title, &t.Amount, &t.Type, &t.Category, &t.Status, &t.Note, &t.CreatedAt, &t.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", "query transaction by id failed", err)
+	}
+	return &t, nil
+}
+
+func (s *Store) Update(ctx context.Context, userID string, id string, tx Transaction) error {
+	query := "UPDATE transactions SET card_id=$1, title=$2, amount=$3, type=$4, category=$5, status=$6, note=$7, updated_at=$8 WHERE id=$9 AND user_id=$10"
+	_, err := s.pool.Exec(ctx, query, tx.CardID, tx.Title, tx.Amount, tx.Type, tx.Category, tx.Status, tx.Note, tx.UpdatedAt, id, userID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", "update transaction failed", err)
+	}
+	return nil
+}
+
+func (s *Store) Delete(ctx context.Context, userID string, id string) error {
+	query := "DELETE FROM transactions WHERE id=$1 AND user_id=$2"
+	_, err := s.pool.Exec(ctx, query, id, userID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", "delete transaction failed", err)
+	}
+	return nil
+}
+
 func (s *Store) GetSummary(ctx context.Context, userID string) (ExpenseSummaryDTO, error) {
 	var totalIncome, totalExpense float64
 

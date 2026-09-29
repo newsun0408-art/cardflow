@@ -10,6 +10,8 @@ export {
   getTransactions,
   getExpenseSummary,
   createTransaction,
+  updateTransaction,
+  deleteTransaction,
   getGoogleDriveStatus,
   saveCardsToSheet,
 } from './api';
@@ -22,6 +24,7 @@ export type {
   CategoryBreakdownDto,
   ExpenseSummaryDto,
   CreateTransactionInput,
+  UpdateTransactionInput,
   SaveCardsToSheetInput,
   SaveCardsToSheetResult,
   GoogleDriveStatusResult,

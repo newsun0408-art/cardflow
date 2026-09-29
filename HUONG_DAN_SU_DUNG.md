@@ -59,6 +59,23 @@ Hệ thống cho phép người dùng chủ động gắn nhãn mục đích chi
 - Khi nhập số tiền chi tiêu hoặc thu nhập trong Modal, số tiền sẽ tự động được định dạng chuẩn: `20.000.000 VNĐ`.
 - Tích hợp các nút cộng nhanh số tiền: `+1.000.000`, `+5.000.000`, `+20.000.000` và nút `Xóa` nhanh.
 
+### 3.4. Chỉnh sửa giao dịch (Edit Transaction):
+- Trên mỗi dòng giao dịch hoặc ngay trong popup **Chi tiết giao dịch**, bấm nút **✏️ (Sửa)**.
+- Form chỉnh sửa hiển thị **đầy đủ thông tin hiện tại**:
+  - Loại giao dịch (Khoản chi tiêu / Khoản thu nhập).
+  - Số tiền (tự động format VNĐ, kèm đọc thành chữ tiếng Việt).
+  - Tên đơn vị / Điểm bán / Nội dung chi tiêu.
+  - Danh mục chi tiêu (Ăn uống, Công nghệ, Di chuyển, Mua sắm, Nhà cửa, Đầu tư, v.v.).
+  - Thẻ ngân hàng thanh toán (chọn lại thẻ khác nếu quẹt nhầm).
+  - Ngày giao dịch, Giờ giao dịch, và Trạng thái (Thành công / Đang xử lý / Thất bại).
+- Sau khi bấm **Lưu Thay Đổi**, hệ thống tự động cập nhật số liệu và điều chỉnh lại hạn mức/chi tiêu trong ngày của thẻ tương ứng.
+
+### 3.5. Xóa giao dịch có xác nhận (Delete Confirmation):
+- Bấm nút **🗑️ (Xóa)** trên dòng giao dịch hoặc trong popup **Chi tiết giao dịch**.
+- Hộp thoại cảnh báo bảo mật Glassmorphism xuất hiện tóm tắt: Tên điểm bán, Số tiền, Thẻ thanh toán, Thời gian và Mã tham chiếu giao dịch.
+- Yêu cầu xác nhận: Người dùng bấm **"Xác Nhận Xóa"** (nút màu đỏ nổi bật) để xóa vĩnh viễn, hoặc bấm **"Hủy Bỏ"** để giữ lại.
+- Dữ liệu tổng chi tiêu và số tiền đã chi hôm nay của thẻ sẽ tự động được hoàn lại chính xác.
+
 ---
 
 ## 📊 4. Sự Khác Biệt Giữa Trang "Giao Dịch" và Trang "Thống Kê"

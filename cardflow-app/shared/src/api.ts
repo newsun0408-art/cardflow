@@ -165,6 +165,24 @@ export function createTransaction(api: HttpClient, input: CreateTransactionInput
   return api.post<{ data: TransactionDto }>('/api/v1/transactions', input);
 }
 
+export interface UpdateTransactionInput {
+  cardId?: string;
+  title?: string;
+  amount?: number;
+  type?: 'EXPENSE' | 'INCOME';
+  category?: string;
+  status?: string;
+  note?: string;
+}
+
+export function updateTransaction(api: HttpClient, id: string, input: UpdateTransactionInput): Promise<{ data: TransactionDto }> {
+  return api.put<{ data: TransactionDto }>(`/api/v1/transactions/${id}`, input);
+}
+
+export function deleteTransaction(api: HttpClient, id: string): Promise<{ message: string; id: string }> {
+  return api.del<{ message: string; id: string }>(`/api/v1/transactions/${id}`);
+}
+
 // ── Google Drive & Sheets API ─────────────────────────────────
 export interface SaveCardsToSheetInput {
   state?: string;

@@ -45,6 +45,16 @@ export default function FullscreenDashboard() {
     setIsDetailCardModalOpen,
     selectedTxDetail,
     setSelectedTxDetail,
+    txToEdit,
+    setTxToEdit,
+    isEditTxModalOpen,
+    setIsEditTxModalOpen,
+    txToDelete,
+    setTxToDelete,
+    isDeleteTxModalOpen,
+    setIsDeleteTxModalOpen,
+    handleOpenEditTx,
+    handleOpenDeleteTx,
     isExportReportOpen,
     setIsExportReportOpen,
     isImportSheetOpen,
@@ -72,6 +82,8 @@ export default function FullscreenDashboard() {
     handleUpdateCard,
     handleAddCard,
     handleAddTransaction,
+    handleUpdateTransaction,
+    handleDeleteTransaction,
     handleProfileSave,
     handleToggleHideBalance,
     getCardMiniGradient,
@@ -228,6 +240,8 @@ export default function FullscreenDashboard() {
               isBalanceHidden={isBalanceHidden}
               onToggleBalance={handleToggleHideBalance}
               onAddTransaction={handleAddTransaction}
+              onEditTransaction={handleOpenEditTx}
+              onDeleteTransaction={handleOpenDeleteTx}
               onOpenExportReport={() => setIsExportReportOpen(true)}
               onOpenImportSheet={() => setIsImportSheetOpen(true)}
               onToast={showToast}
@@ -301,6 +315,22 @@ export default function FullscreenDashboard() {
         onToast={showToast}
         isGuideModalOpen={isGuideModalOpen}
         onCloseGuideModal={() => setIsGuideModalOpen(false)}
+        isEditTxModalOpen={isEditTxModalOpen}
+        onCloseEditTxModal={() => {
+          setIsEditTxModalOpen(false);
+          setTxToEdit(null);
+        }}
+        txToEdit={txToEdit}
+        onSaveEditTx={handleUpdateTransaction}
+        isDeleteTxModalOpen={isDeleteTxModalOpen}
+        onCloseDeleteTxModal={() => {
+          setIsDeleteTxModalOpen(false);
+          setTxToDelete(null);
+        }}
+        txToDelete={txToDelete}
+        onConfirmDeleteTx={handleDeleteTransaction}
+        onOpenEditTx={handleOpenEditTx}
+        onOpenDeleteTx={handleOpenDeleteTx}
       />
     </div>
   );

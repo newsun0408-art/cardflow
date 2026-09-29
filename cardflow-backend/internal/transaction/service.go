@@ -64,6 +64,44 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateTransacti
 	return toDTO(t), nil
 }
 
+func (s *Service) Update(ctx context.Context, userID string, id string, req UpdateTransactionRequest) (TransactionDTO, error) {
+	existing, err := s.repo.GetByID(ctx, userID, id)
+	if err != nil {
+		return TransactionDTO{}, fmt.Errorf("transaction not found: %w", err)
+	}
+	if req.Title != "" {
+		existing.Title = req.Title
+	}
+	if req.Amount > 0 {
+		existing.Amount = req.Amount
+	}
+	if req.CardID != "" {
+		existing.CardID = req.CardID
+	}
+	if req.Type != "" {
+		existing.Type = req.Type
+	}
+	if req.Category != "" {
+		existing.Category = req.Category
+	}
+	if req.Status != "" {
+		existing.Status = req.Status
+	}
+	if req.Note != "" {
+		existing.Note = req.Note
+	}
+	existing.UpdatedAt = time.Now()
+
+	if err := s.repo.Update(ctx, userID, id, *existing); err != nil {
+		return TransactionDTO{}, err
+	}
+	return toDTO(*existing), nil
+}
+
+func (s *Service) Delete(ctx context.Context, userID string, id string) error {
+	return s.repo.Delete(ctx, userID, id)
+}
+
 func (s *Service) GetSummary(ctx context.Context, userID string) (ExpenseSummaryDTO, error) {
 	return s.repo.GetSummary(ctx, userID)
 }

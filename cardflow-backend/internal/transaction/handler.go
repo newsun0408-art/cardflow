@@ -19,6 +19,8 @@ func (h *Handler) RegisterRoutes(e *echo.Echo) {
 
 	g.GET("", h.listTransactions)
 	g.POST("", h.createTransaction)
+	g.PUT("/:id", h.updateTransaction)
+	g.DELETE("/:id", h.deleteTransaction)
 	g.GET("/summary", h.getSummary)
 }
 
@@ -54,6 +56,40 @@ func (h *Handler) createTransaction(c echo.Context) error {
 	}
 	return c.JSON(http.StatusCreated, map[string]any{
 		"data": created,
+	})
+}
+
+func (h *Handler) updateTransaction(c echo.Context) error {
+	userID := c.Request().Header.Get("X-User-Id")
+	if userID == "" {
+		userID = "usr-001"
+	}
+	id := c.Param("id")
+	var req UpdateTransactionRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+	updated, err := h.svc.Update(c.Request().Context(), userID, id, req)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]any{
+		"data": updated,
+	})
+}
+
+func (h *Handler) deleteTransaction(c echo.Context) error {
+	userID := c.Request().Header.Get("X-User-Id")
+	if userID == "" {
+		userID = "usr-001"
+	}
+	id := c.Param("id")
+	if err := h.svc.Delete(c.Request().Context(), userID, id); err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]any{
+		"message": "transaction deleted successfully",
+		"id":      id,
 	})
 }
 

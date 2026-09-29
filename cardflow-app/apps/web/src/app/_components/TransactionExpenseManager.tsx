@@ -5,6 +5,8 @@ import {
   ExpenseCharts,
   TransactionFeed,
   AddTransactionModal,
+  EditTransactionModal,
+  DeleteTransactionModal,
   ExpenseAnalyticsModals,
   type TransactionItem,
   type CategoryBreakdownItem,
@@ -25,6 +27,8 @@ export function TransactionExpenseManager({
   onToast,
   activeTab = 'transactions',
   onSelectTransaction,
+  onEditTransaction,
+  onDeleteTransaction,
 }: TransactionExpenseManagerProps) {
   // Navigation / Date state
   const [currentMonthIndex, setCurrentMonthIndex] = useState(0);
@@ -33,6 +37,10 @@ export function TransactionExpenseManager({
 
   // Modals state
   const [isAddTxModalOpen, setIsAddTxModalOpen] = useState(false);
+  const [txToEdit, setTxToEdit] = useState<TransactionItem | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [txToDelete, setTxToDelete] = useState<TransactionItem | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [isTipsModalOpen, setIsTipsModalOpen] = useState(false);
   const [selectedCategoryDetail, setSelectedCategoryDetail] = useState<CategoryBreakdownItem | null>(null);
@@ -217,6 +225,20 @@ export function TransactionExpenseManager({
       onOpenExportReport={onOpenExportReport}
       onOpenImportSheet={onOpenImportSheet}
       onSelectTransaction={onSelectTransaction}
+      onEditTransaction={(tx) => {
+        if (onEditTransaction) onEditTransaction(tx);
+        else {
+          setTxToEdit(tx);
+          setIsEditModalOpen(true);
+        }
+      }}
+      onDeleteTransaction={(tx) => {
+        if (onDeleteTransaction) onDeleteTransaction(tx);
+        else {
+          setTxToDelete(tx);
+          setIsDeleteModalOpen(true);
+        }
+      }}
     />
   );
 
@@ -265,6 +287,36 @@ export function TransactionExpenseManager({
         onCloseAIModal={() => setIsAIModalOpen(false)}
         isTipsModalOpen={isTipsModalOpen}
         onCloseTipsModal={() => setIsTipsModalOpen(false)}
+      />
+
+      {/* 5. Edit Transaction Modal */}
+      <EditTransactionModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setTxToEdit(null);
+        }}
+        transaction={txToEdit}
+        cards={cards}
+        onSave={(updated) => {
+          onEditTransaction?.(updated);
+        }}
+        onToast={onToast}
+      />
+
+      {/* 6. Delete Transaction Modal */}
+      <DeleteTransactionModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setTxToDelete(null);
+        }}
+        transaction={txToDelete}
+        onConfirmDelete={() => {
+          if (txToDelete && onDeleteTransaction) {
+            onDeleteTransaction(txToDelete);
+          }
+        }}
       />
     </div>
   );

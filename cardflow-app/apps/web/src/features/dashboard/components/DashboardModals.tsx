@@ -7,6 +7,8 @@ import {
   CalendarOutlined,
   ShopOutlined,
   TagOutlined,
+  EditOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import { AddCardModal } from '@/app/_components/AddCardModal';
 import { ChangePinModal } from '@/app/_components/ChangePinModal';
@@ -17,6 +19,8 @@ import { VerifyPinModal } from '@/app/_components/VerifyPinModal';
 import { ExportReportModal } from '@/app/_components/ExportReportModal';
 import { ImportSheetModal } from '@/app/_components/ImportSheetModal';
 import { UserGuideModal } from '@/app/_components/UserGuideModal';
+import { EditTransactionModal } from '@/features/transactions/components/EditTransactionModal';
+import { DeleteTransactionModal } from '@/features/transactions/components/DeleteTransactionModal';
 import type { CardDataModel, TransactionItem } from '../types';
 
 interface DashboardModalsProps {
@@ -56,6 +60,16 @@ interface DashboardModalsProps {
   onToast: (msg: string) => void;
   isGuideModalOpen?: boolean;
   onCloseGuideModal?: () => void;
+  isEditTxModalOpen?: boolean;
+  onCloseEditTxModal?: () => void;
+  txToEdit?: TransactionItem | null;
+  onSaveEditTx?: (updatedTx: TransactionItem) => void;
+  isDeleteTxModalOpen?: boolean;
+  onCloseDeleteTxModal?: () => void;
+  txToDelete?: TransactionItem | null;
+  onConfirmDeleteTx?: (txId: string) => void;
+  onOpenEditTx?: (tx: TransactionItem) => void;
+  onOpenDeleteTx?: (tx: TransactionItem) => void;
 }
 
 export function DashboardModals({
@@ -79,7 +93,7 @@ export function DashboardModals({
   onThemeChange,
   selectedTxDetail,
   onCloseTxDetail,
-  onReportTxIssue,
+  onReportTxIssue: _onReportTxIssue,
   isVerifyPinModalOpen,
   targetCardForPin,
   onCloseVerifyPin,
@@ -95,6 +109,16 @@ export function DashboardModals({
   onToast,
   isGuideModalOpen = false,
   onCloseGuideModal,
+  isEditTxModalOpen = false,
+  onCloseEditTxModal,
+  txToEdit,
+  onSaveEditTx,
+  isDeleteTxModalOpen = false,
+  onCloseDeleteTxModal,
+  txToDelete,
+  onConfirmDeleteTx,
+  onOpenEditTx,
+  onOpenDeleteTx,
 }: DashboardModalsProps) {
   const [hasCopiedRef, setHasCopiedRef] = useState(false);
 
@@ -430,30 +454,69 @@ export function DashboardModals({
             </div>
 
             {/* Actions */}
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={onReportTxIssue}
-                style={{
-                  flex: 1,
-                  padding: '10px 0',
-                  borderRadius: '10px',
-                  background: 'rgba(239, 68, 68, 0.12)',
-                  border: '1px solid rgba(239, 68, 68, 0.25)',
-                  color: '#fca5a5',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                Báo Cáo Sai Sót
-              </button>
+            <div style={{ display: 'grid', gridTemplateColumns: (onOpenEditTx || onOpenDeleteTx) ? '1fr 1fr 1fr' : '1fr 1fr', gap: '8px' }}>
+              {onOpenEditTx && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const tx = selectedTxDetail;
+                    onCloseTxDetail();
+                    onOpenEditTx(tx);
+                  }}
+                  style={{
+                    padding: '10px 0',
+                    borderRadius: '10px',
+                    background: 'rgba(56, 189, 248, 0.12)',
+                    border: '1px solid rgba(56, 189, 248, 0.3)',
+                    color: '#38bdf8',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    transition: 'all 0.2s',
+                  }}
+                  title="Chỉnh sửa giao dịch này"
+                >
+                  <EditOutlined /> Sửa
+                </button>
+              )}
+
+              {onOpenDeleteTx && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const tx = selectedTxDetail;
+                    onCloseTxDetail();
+                    onOpenDeleteTx(tx);
+                  }}
+                  style={{
+                    padding: '10px 0',
+                    borderRadius: '10px',
+                    background: 'rgba(239, 68, 68, 0.12)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    color: '#f87171',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    transition: 'all 0.2s',
+                  }}
+                  title="Xóa giao dịch này"
+                >
+                  <DeleteOutlined /> Xóa
+                </button>
+              )}
 
               <button
                 type="button"
                 onClick={onCloseTxDetail}
                 style={{
-                  flex: 1,
                   padding: '10px 0',
                   borderRadius: '10px',
                   background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
@@ -509,6 +572,28 @@ export function DashboardModals({
         isOpen={Boolean(isGuideModalOpen)}
         onClose={onCloseGuideModal || (() => {})}
       />
+
+      {/* Edit Transaction Modal */}
+      {onCloseEditTxModal && onSaveEditTx && (
+        <EditTransactionModal
+          isOpen={Boolean(isEditTxModalOpen)}
+          onClose={onCloseEditTxModal}
+          transaction={txToEdit || null}
+          cards={cards || (activeCard ? [activeCard] : [])}
+          onSave={onSaveEditTx}
+          onToast={onToast}
+        />
+      )}
+
+      {/* Delete Transaction Confirmation Modal */}
+      {onCloseDeleteTxModal && onConfirmDeleteTx && (
+        <DeleteTransactionModal
+          isOpen={Boolean(isDeleteTxModalOpen)}
+          onClose={onCloseDeleteTxModal}
+          transaction={txToDelete || null}
+          onConfirmDelete={onConfirmDeleteTx}
+        />
+      )}
     </>
   );
 }

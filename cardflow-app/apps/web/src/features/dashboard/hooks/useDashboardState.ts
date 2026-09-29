@@ -13,6 +13,8 @@ import {
   createCard,
   getTransactions,
   createTransaction,
+  updateTransaction,
+  deleteTransaction,
   getGoogleDriveStatus,
   saveCardsToSheet,
   type SaveCardsToSheetInput,
@@ -136,6 +138,10 @@ export function useDashboardState() {
   const [isLimitModalOpen, setIsLimitModalOpen] = useState(false);
   const [isDetailCardModalOpen, setIsDetailCardModalOpen] = useState(false);
   const [selectedTxDetail, setSelectedTxDetail] = useState<TransactionItem | null>(null);
+  const [txToEdit, setTxToEdit] = useState<TransactionItem | null>(null);
+  const [isEditTxModalOpen, setIsEditTxModalOpen] = useState(false);
+  const [txToDelete, setTxToDelete] = useState<TransactionItem | null>(null);
+  const [isDeleteTxModalOpen, setIsDeleteTxModalOpen] = useState(false);
   const [isExportReportOpen, setIsExportReportOpen] = useState(false);
   const [isImportSheetOpen, setIsImportSheetOpen] = useState(false);
   const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
@@ -622,6 +628,113 @@ export function useDashboardState() {
     }
   };
 
+  const handleUpdateTransaction = (updatedTx: TransactionItem) => {
+    const oldTx = transactions.find((t) => t.id === updatedTx.id);
+
+    setTransactions((prev) =>
+      prev.map((t) => (t.id === updatedTx.id ? updatedTx : t))
+    );
+
+    if (oldTx) {
+      const oldExpense = oldTx.type === 'expense' ? Math.abs(oldTx.amount) : 0;
+      const newExpense = updatedTx.type === 'expense' ? Math.abs(updatedTx.amount) : 0;
+
+      if (oldTx.cardId === updatedTx.cardId) {
+        const delta = newExpense - oldExpense;
+        if (delta !== 0) {
+          setCards((prev) =>
+            prev.map((c) =>
+              c.id === updatedTx.cardId
+                ? { ...c, spentToday: Math.max(0, c.spentToday + delta) }
+                : c
+            )
+          );
+        }
+      } else {
+        setCards((prev) =>
+          prev.map((c) => {
+            if (c.id === oldTx.cardId) {
+              return { ...c, spentToday: Math.max(0, c.spentToday - oldExpense) };
+            }
+            if (c.id === updatedTx.cardId) {
+              return { ...c, spentToday: c.spentToday + newExpense };
+            }
+            return c;
+          })
+        );
+      }
+    }
+
+    if (selectedTxDetail && selectedTxDetail.id === updatedTx.id) {
+      setSelectedTxDetail(updatedTx);
+    }
+
+    try {
+      const api = createApi();
+      const catReverse: Record<string, string> = {
+        tech: 'TECHNOLOGY',
+        dining: 'FOOD',
+        transport: 'TRANSPORT',
+        housing: 'HOUSING',
+        other: 'OTHER',
+      };
+      updateTransaction(api, updatedTx.id, {
+        cardId: updatedTx.cardId,
+        title: updatedTx.merchant,
+        amount: Math.abs(updatedTx.amount),
+        type: updatedTx.type === 'expense' ? 'EXPENSE' : 'INCOME',
+        category: catReverse[updatedTx.category] || 'OTHER',
+        status: updatedTx.status === 'Thành công' ? 'SUCCESS' : updatedTx.status === 'Đang xử lý' ? 'PENDING' : 'FAILED',
+        note: 'Updated via Web Dashboard',
+      }).catch(() => {});
+    } catch {
+      // Ignore
+    }
+
+    showToast(`✏️ Đã cập nhật giao dịch "${updatedTx.merchant}"`);
+  };
+
+  const handleDeleteTransaction = (txId: string) => {
+    const txToDelete = transactions.find((t) => t.id === txId);
+    if (!txToDelete) return;
+
+    setTransactions((prev) => prev.filter((t) => t.id !== txId));
+
+    if (txToDelete.type === 'expense') {
+      const expenseAmount = Math.abs(txToDelete.amount);
+      setCards((prev) =>
+        prev.map((c) =>
+          c.id === txToDelete.cardId
+            ? { ...c, spentToday: Math.max(0, c.spentToday - expenseAmount) }
+            : c
+        )
+      );
+    }
+
+    if (selectedTxDetail && selectedTxDetail.id === txId) {
+      setSelectedTxDetail(null);
+    }
+
+    try {
+      const api = createApi();
+      deleteTransaction(api, txId).catch(() => {});
+    } catch {
+      // Ignore
+    }
+
+    showToast(`🗑️ Đã xóa giao dịch "${txToDelete.merchant}"`);
+  };
+
+  const handleOpenEditTx = (tx: TransactionItem) => {
+    setTxToEdit(tx);
+    setIsEditTxModalOpen(true);
+  };
+
+  const handleOpenDeleteTx = (tx: TransactionItem) => {
+    setTxToDelete(tx);
+    setIsDeleteTxModalOpen(true);
+  };
+
   const handleProfileSave = (updated: UserProfile) => {
     setUserProfile(updated);
     setCards((prev) =>
@@ -824,6 +937,16 @@ export function useDashboardState() {
     setIsDetailCardModalOpen,
     selectedTxDetail,
     setSelectedTxDetail,
+    txToEdit,
+    setTxToEdit,
+    isEditTxModalOpen,
+    setIsEditTxModalOpen,
+    txToDelete,
+    setTxToDelete,
+    isDeleteTxModalOpen,
+    setIsDeleteTxModalOpen,
+    handleOpenEditTx,
+    handleOpenDeleteTx,
     isExportReportOpen,
     setIsExportReportOpen,
     isImportSheetOpen,
@@ -851,6 +974,8 @@ export function useDashboardState() {
     handleUpdateCard,
     handleAddCard,
     handleAddTransaction,
+    handleUpdateTransaction,
+    handleDeleteTransaction,
     handleProfileSave,
     handleToggleHideBalance,
     getCardMiniGradient,

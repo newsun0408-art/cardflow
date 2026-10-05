@@ -1,13 +1,33 @@
 {
   "expo": {
-    "name": "Cardflow app",
+    "name": "Cardflow",
     "slug": "cardflow-app",
     "scheme": "cardflow-app",
     "version": "0.1.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
-    "plugins": ["expo-router", "expo-secure-store"],
-    "experiments": { "typedRoutes": true }
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cardflow.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Cardflow cần quyền sử dụng máy ảnh để quét và bóc tách hóa đơn tự động bằng AI.",
+        "NSPhotoLibraryUsageDescription": "Cardflow cần quyền truy cập thư viện ảnh để tải lên ảnh hóa đơn chi tiêu."
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cardflow cần quyền truy cập thư viện ảnh để tải lên ảnh hóa đơn chi tiêu.",
+          "cameraPermission": "Cardflow cần quyền sử dụng máy ảnh để quét và bóc tách hóa đơn tự động bằng AI."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }

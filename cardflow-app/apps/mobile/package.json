@@ -12,7 +12,10 @@
   },
   "dependencies": {
     "@cardflow-app/shared": "workspace:*",
+    "@expo/vector-icons": "^15.1.1",
     "expo": "^57.0.22",
+    "expo-image-picker": "^57.0.20",
+    "expo-linear-gradient": "^57.0.2",
     "expo-router": "^57.0.21",
     "expo-secure-store": "^15.0.0",
     "fe-kit": "github:bangdinh/fe-kit#main",

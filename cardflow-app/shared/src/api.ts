@@ -13,7 +13,7 @@ export function createApi(options: ApiOptions = {}): HttpClient {
   let uid = options.userId;
   if (!uid && isBrowser) {
     try {
-      uid = localStorage.getItem('cardflow_user_id') || 'usr-001';
+      uid = (globalThis as any).localStorage?.getItem?.('cardflow_user_id') || 'usr-001';
     } catch {
       uid = 'usr-001';
     }

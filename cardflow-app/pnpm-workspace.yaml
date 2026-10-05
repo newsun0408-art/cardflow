@@ -4,4 +4,4 @@ packages:
 allowBuilds:
   '@firebase/util': true
   protobufjs: true
-  tesseract.js: set this to true or false
+  tesseract.js: true

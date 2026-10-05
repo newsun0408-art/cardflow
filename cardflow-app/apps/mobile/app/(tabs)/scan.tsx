@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { env } from '@cardflow-app/shared';
+import { useCardflow } from '../../src/context/CardflowContext';
 
 interface ScannedResult {
   merchant: string;
@@ -28,6 +29,7 @@ interface ScannedResult {
 }
 
 export default function ScanScreen() {
+  const { cards, addTransaction } = useCardflow();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanStep, setScanStep] = useState('');
@@ -104,7 +106,7 @@ export default function ScanScreen() {
         date: '2025-09-22',
         time: '15:32',
         confidence: 98,
-        suggestedCardName: 'Cardflow Dining Visa (9921)',
+        suggestedCardName: 'Techcombank (9921)',
       });
       setIsScanning(false);
     }, 1200);
@@ -135,7 +137,7 @@ export default function ScanScreen() {
           date: data.date || '2025-09-22',
           time: data.time || '15:32',
           confidence: data.confidence || 96,
-          suggestedCardName: 'Cardflow Bank (9921)',
+          suggestedCardName: cards[0]?.bankName ? `${cards[0].bankName} (${cards[0].lastFourDigits})` : 'Cardflow Bank',
         });
       } else {
         // Fallback nhận diện thông minh
@@ -147,7 +149,7 @@ export default function ScanScreen() {
           date: '2025-09-22',
           time: '15:32',
           confidence: 92,
-          suggestedCardName: 'Cardflow Bank (9921)',
+          suggestedCardName: cards[0]?.bankName ? `${cards[0].bankName} (${cards[0].lastFourDigits})` : 'Cardflow Bank',
         });
       }
     } catch {
@@ -160,7 +162,7 @@ export default function ScanScreen() {
         date: '2025-09-22',
         time: '15:32',
         confidence: 90,
-        suggestedCardName: 'Cardflow Bank (9921)',
+        suggestedCardName: cards[0]?.bankName ? `${cards[0].bankName} (${cards[0].lastFourDigits})` : 'Cardflow Bank',
       });
     } finally {
       setIsScanning(false);
@@ -168,9 +170,27 @@ export default function ScanScreen() {
   };
 
   const handleSaveTransaction = () => {
+    if (!scannedResult) return;
+    const card = cards[0];
+
+    addTransaction({
+      cardId: card?.id || '',
+      cardName: card ? `${card.bankName} (${card.lastFourDigits})` : 'Techcombank (9921)',
+      merchant: scannedResult.merchant,
+      category: scannedResult.category,
+      categoryLabel: scannedResult.categoryLabel,
+      amount: scannedResult.amount,
+      type: 'expense',
+      date: 'Hôm nay',
+      time: scannedResult.time,
+      note: 'Quét tự động qua AI Vision OCR',
+      icon: 'receipt-outline',
+      color: '#38bdf8',
+    });
+
     Alert.alert(
       'Lưu Thành Công',
-      `Đã ghi nhận chi tiêu: ${scannedResult?.merchant} (-${scannedResult?.amount.toLocaleString('vi-VN')} VNĐ)`
+      `Đã ghi nhận chi tiêu: ${scannedResult.merchant} (-${scannedResult.amount.toLocaleString('vi-VN')} VNĐ) vào thẻ ${card?.bankName || 'chính'}!`
     );
     setSelectedImage(null);
     setScannedResult(null);

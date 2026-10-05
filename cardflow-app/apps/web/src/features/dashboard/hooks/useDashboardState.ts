@@ -179,7 +179,7 @@ export function useDashboardState() {
             }
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     } catch {
       // Ignore
     }
@@ -271,7 +271,7 @@ export function useDashboardState() {
       if (cards.length > 0) {
         localStorage.removeItem('cardflow_is_new_user');
       }
-    } catch {}
+    } catch { }
   }, [cards, isStorageLoaded]);
 
   // Save transactions to localStorage whenever transactions change
@@ -280,7 +280,7 @@ export function useDashboardState() {
     try {
       const userId = localStorage.getItem('cardflow_user_id') || 'guest';
       localStorage.setItem(`cardflow_txs_${userId}`, JSON.stringify(transactions));
-    } catch {}
+    } catch { }
   }, [transactions, isStorageLoaded]);
 
   // Backend Connection Status
@@ -445,7 +445,7 @@ export function useDashboardState() {
     if (!targetCardForPin || !result.decryptedData) return;
 
     const cardId = targetCardForPin.id;
-    const expiresSec = result.expiresInSeconds || 20;
+    const expiresSec = result.expiresInSeconds || 90;
 
     setDecryptedSensitiveData((prev) => ({
       ...prev,
@@ -567,23 +567,23 @@ export function useDashboardState() {
               prev.map((c) =>
                 c.id === newId
                   ? {
-                      ...c,
-                      id: cardObj.id,
-                      cardNumberFormatted: '•••• •••• •••• ' + cardObj.cardNumber.replace(/\s+/g, '').slice(-4),
-                      lastFourDigits: cardObj.cardNumber.replace(/\s+/g, '').slice(-4),
-                    }
+                    ...c,
+                    id: cardObj.id,
+                    cardNumberFormatted: '•••• •••• •••• ' + cardObj.cardNumber.replace(/\s+/g, '').slice(-4),
+                    lastFourDigits: cardObj.cardNumber.replace(/\s+/g, '').slice(-4),
+                  }
                   : c
               )
             );
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     } catch {
       // Ignore network errors
     }
 
     if (newCardData.syncToSheet) {
-      handleSaveCardsToGoogleSheet([...cards, newCard]).catch(() => {});
+      handleSaveCardsToGoogleSheet([...cards, newCard]).catch(() => { });
     }
   };
 
@@ -612,7 +612,7 @@ export function useDashboardState() {
         type: newTxData.type === 'expense' ? 'EXPENSE' : 'INCOME',
         category: catReverse[newTxData.category] || 'OTHER',
         note: 'Created via Web Dashboard',
-      }).catch(() => {});
+      }).catch(() => { });
     } catch {
       // Network ignore
     }
@@ -686,7 +686,7 @@ export function useDashboardState() {
         category: catReverse[updatedTx.category] || 'OTHER',
         status: updatedTx.status === 'Thành công' ? 'SUCCESS' : updatedTx.status === 'Đang xử lý' ? 'PENDING' : 'FAILED',
         note: 'Updated via Web Dashboard',
-      }).catch(() => {});
+      }).catch(() => { });
     } catch {
       // Ignore
     }
@@ -717,7 +717,7 @@ export function useDashboardState() {
 
     try {
       const api = createApi();
-      deleteTransaction(api, txId).catch(() => {});
+      deleteTransaction(api, txId).catch(() => { });
     } catch {
       // Ignore
     }

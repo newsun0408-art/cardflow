@@ -230,63 +230,96 @@ export function AddCardModal({ isOpen, onClose, onAddCard }: AddCardModalProps) 
   const disabled = (step === 0 && !step0Valid) || (step === 1 && !step1Valid);
 
   return (
-    <div style={{
-      position:'fixed',inset:0,zIndex:10000,
-      background:'rgba(2,6,23,0.88)',backdropFilter:'blur(14px)',
-      display:'flex',alignItems:'center',justifyContent:'center',padding:'16px',
-    }}>
-      <div style={{
-        width:'100%',maxWidth:'520px',
-        background:'rgba(10,18,38,0.97)',
-        border:'1px solid rgba(56,189,248,0.25)',borderRadius:'24px',
-        boxShadow:'0 30px 80px rgba(0,0,0,0.8)',overflow:'hidden',
-      }}>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 10000,
+        background: 'rgba(2,6,23,0.88)',
+        backdropFilter: 'blur(14px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+        overflowY: 'auto',
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '520px',
+          maxHeight: 'min(90vh, 760px)',
+          display: 'flex',
+          flexDirection: 'column',
+          background: 'rgba(10,18,38,0.97)',
+          border: '1px solid rgba(56,189,248,0.25)',
+          borderRadius: '24px',
+          boxShadow: '0 30px 80px rgba(0,0,0,0.8)',
+          overflow: 'hidden',
+          margin: 'auto',
+        }}
+      >
 
         {/* Header */}
-        <div style={{
-          padding:'20px 24px 16px',background:'rgba(2,132,199,0.08)',
-          borderBottom:'1px solid rgba(255,255,255,0.07)',
-          display:'flex',justifyContent:'space-between',alignItems:'center',
-        }}>
-          <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
-            <div style={{width:'38px',height:'38px',borderRadius:'10px',background:'rgba(56,189,248,0.15)',color:'#38bdf8',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'20px'}}>
+        <div
+          style={{
+            padding: '20px 24px 16px',
+            background: 'rgba(2,132,199,0.08)',
+            borderBottom: '1px solid rgba(255,255,255,0.07)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(56,189,248,0.15)', color: '#38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
               <CreditCardOutlined />
             </div>
             <div>
-              <div style={{fontWeight:800,fontSize:'17px',color:'#fff'}}>Thêm Thẻ Ngân Hàng</div>
-              <div style={{fontSize:'11px',color:'#64748b'}}>Bảo mật chuẩn fintech — mã hoá AES-256</div>
+              <div style={{ fontWeight: 800, fontSize: '17px', color: '#fff' }}>Thêm Thẻ Ngân Hàng</div>
+              <div style={{ fontSize: '11px', color: '#64748b' }}>Bảo mật chuẩn fintech — mã hoá AES-256</div>
             </div>
           </div>
-          <button onClick={onClose} style={{background:'none',border:'none',color:'#64748b',cursor:'pointer',fontSize:'18px',padding:'4px'}}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '18px', padding: '4px' }}>
             <CloseOutlined />
           </button>
         </div>
 
         {/* Steps */}
-        <div style={{display:'flex',padding:'16px 24px 0',gap:'6px'}}>
+        <div style={{ display: 'flex', padding: '16px 24px 0', gap: '6px', flexShrink: 0 }}>
           {STEPS.map((s, i) => (
-            <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'5px'}}>
+            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
               <div style={{
-                width:'32px',height:'32px',borderRadius:'50%',
+                width: '32px', height: '32px', borderRadius: '50%',
                 background: i < step ? '#0284c7' : i === step ? 'rgba(56,189,248,0.2)' : 'rgba(255,255,255,0.05)',
                 border: `2px solid ${i <= step ? '#38bdf8' : 'rgba(255,255,255,0.1)'}`,
                 color: i <= step ? '#38bdf8' : '#475569',
-                display:'flex',alignItems:'center',justifyContent:'center',fontSize:'14px',transition:'all .3s',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', transition: 'all .3s',
               }}>
-                {i < step ? <CheckOutlined style={{fontSize:'12px'}} /> : s.icon}
+                {i < step ? <CheckOutlined style={{ fontSize: '12px' }} /> : s.icon}
               </div>
-              <span style={{fontSize:'9px',color:i===step?'#38bdf8':'#475569',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em',textAlign:'center'}}>
+              <span style={{ fontSize: '9px', color: i === step ? '#38bdf8' : '#475569', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>
                 {s.label}
               </span>
             </div>
           ))}
         </div>
-        <div style={{margin:'10px 24px 0',height:'2px',background:'rgba(255,255,255,0.06)',borderRadius:'2px'}}>
-          <div style={{height:'100%',width:`${(step/(STEPS.length-1))*100}%`,background:'linear-gradient(90deg,#0284c7,#38bdf8)',borderRadius:'2px',transition:'width .4s ease'}} />
+        <div style={{ margin: '10px 24px 0', height: '2px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', flexShrink: 0 }}>
+          <div style={{ height: '100%', width: `${(step / (STEPS.length - 1)) * 100}%`, background: 'linear-gradient(90deg,#0284c7,#38bdf8)', borderRadius: '2px', transition: 'width .4s ease' }} />
         </div>
 
         {/* Body */}
-        <div style={{padding:'20px 24px 24px'}}>
+        <div
+          style={{
+            padding: '20px 24px',
+            overflowY: 'auto',
+            flex: 1,
+            minHeight: 0,
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'rgba(56, 189, 248, 0.3) transparent',
+          }}
+        >
 
           {/* STEP 0 */}
           {step === 0 && (
@@ -563,33 +596,63 @@ export function AddCardModal({ isOpen, onClose, onAddCard }: AddCardModalProps) 
               </div>
             </div>
           )}
+        </div>
 
-          {/* Navigation */}
-          <div style={{display:'flex',gap:'10px',marginTop:'20px'}}>
-            {step > 0 && (
-              <button onClick={()=>setStep(s=>s-1)} style={{
-                padding:'11px 18px',borderRadius:'10px',background:'rgba(255,255,255,0.06)',
-                border:'1px solid rgba(255,255,255,0.1)',color:'#94a3b8',cursor:'pointer',
-                fontSize:'13px',fontWeight:600,display:'flex',alignItems:'center',gap:'6px',
-              }}>
-                <ArrowLeftOutlined/> Quay lại
-              </button>
-            )}
+        {/* Navigation Footer (Pinned at bottom) */}
+        <div
+          style={{
+            display: 'flex',
+            gap: '10px',
+            padding: '16px 24px',
+            background: 'rgba(8,14,30,0.98)',
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+            flexShrink: 0,
+          }}
+        >
+          {step > 0 && (
             <button
-              onClick={()=>{ if(step<STEPS.length-1) setStep(s=>s+1); else handleSubmit(); }}
-              disabled={disabled}
+              type="button"
+              onClick={() => setStep((s) => s - 1)}
               style={{
-                flex:1,padding:'12px 0',borderRadius:'10px',
-                background: disabled ? 'rgba(56,189,248,0.1)' : 'linear-gradient(135deg,#0284c7 0%,#38bdf8 100%)',
-                color: disabled ? '#475569' : '#fff',
-                border:'none',cursor:disabled?'not-allowed':'pointer',
-                fontSize:'14px',fontWeight:700,
-                boxShadow:'0 0 20px rgba(56,189,248,0.2)',transition:'all .2s',
+                padding: '11px 18px',
+                borderRadius: '10px',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                color: '#94a3b8',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
               }}
             >
-              {step===STEPS.length-1 ? '✅ Lưu Thẻ' : 'Tiếp theo →'}
+              <ArrowLeftOutlined /> Quay lại
             </button>
-          </div>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              if (step < STEPS.length - 1) setStep((s) => s + 1);
+              else handleSubmit();
+            }}
+            disabled={disabled}
+            style={{
+              flex: 1,
+              padding: '12px 0',
+              borderRadius: '10px',
+              background: disabled ? 'rgba(56,189,248,0.1)' : 'linear-gradient(135deg,#0284c7 0%,#38bdf8 100%)',
+              color: disabled ? '#475569' : '#fff',
+              border: 'none',
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              fontSize: '14px',
+              fontWeight: 700,
+              boxShadow: '0 0 20px rgba(56,189,248,0.2)',
+              transition: 'all .2s',
+            }}
+          >
+            {step === STEPS.length - 1 ? '✅ Lưu Thẻ' : 'Tiếp theo →'}
+          </button>
         </div>
       </div>
     </div>

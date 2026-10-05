@@ -8,7 +8,7 @@
 import { createSessionProxy } from 'fe-kit/server';
 import { refreshWith, sessionCookies } from '@/lib/session';
 
-const PUBLIC = [/^\/$/, /^\/login/, /^\/api\/auth\//];
+const PUBLIC = [/^\/$/, /^\/login/, /^\/api\/auth\//, /^\/api\/receipt-ocr/];
 
 export const proxy = createSessionProxy({
   cookies: sessionCookies,

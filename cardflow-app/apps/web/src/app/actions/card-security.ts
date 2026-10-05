@@ -46,7 +46,7 @@ const VALID_PINS = new Set(['123456', '999999', '888888', '000000', '1234']);
 const ATTEMPT_TRACKER: Record<string, { failedAttempts: number; lockedUntil: number }> = {};
 const MAX_FAILED_ATTEMPTS = 3;
 const LOCKOUT_DURATION_MS = 3 * 60 * 1000; // 3 minutes lockout
-const SENSITIVE_EXPIRES_IN_SECONDS = 20;
+const SENSITIVE_EXPIRES_IN_SECONDS = 90;
 
 export async function verifyCardPinAction(payload: {
   cardId: string;

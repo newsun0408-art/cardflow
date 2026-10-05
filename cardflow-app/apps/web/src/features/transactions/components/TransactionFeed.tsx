@@ -17,6 +17,7 @@ import {
   FileExcelOutlined,
   EditOutlined,
   DeleteOutlined,
+  ScanOutlined,
 } from '@ant-design/icons';
 import type { CardDataModel } from '@/app/_components/AddCardModal';
 import type { TransactionItem } from '../types';
@@ -42,6 +43,7 @@ interface TransactionFeedProps {
   filteredIncome?: number;
   activeTab?: 'transactions' | 'stats';
   onOpenAddTxModal?: () => void;
+  onOpenReceiptScanner?: () => void;
   onOpenExportReport?: () => void;
   onOpenImportSheet?: () => void;
   onSelectTransaction?: (tx: TransactionItem) => void;
@@ -69,6 +71,7 @@ export function TransactionFeed({
   filteredIncome = 0,
   activeTab: _activeTab = 'transactions',
   onOpenAddTxModal,
+  onOpenReceiptScanner,
   onOpenExportReport,
   onOpenImportSheet: _onOpenImportSheet,
   onSelectTransaction,
@@ -167,8 +170,32 @@ export function TransactionFeed({
           </div>
         </div>
 
-        {/* 2 Nút hành động chính */}
+        {/* Nút hành động chính */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {onOpenReceiptScanner && (
+            <button
+              type="button"
+              onClick={onOpenReceiptScanner}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.18) 0%, rgba(2, 132, 199, 0.28) 100%)',
+                color: '#38bdf8',
+                border: '1px solid rgba(56, 189, 248, 0.45)',
+                fontWeight: 700,
+                fontSize: '13px',
+                cursor: 'pointer',
+                boxShadow: '0 0 15px rgba(56, 189, 248, 0.18)',
+                transition: 'all 0.2s',
+              }}
+            >
+              <ScanOutlined /> Quét Hóa Đơn AI
+            </button>
+          )}
+
           {onOpenAddTxModal && (
             <button
               type="button"

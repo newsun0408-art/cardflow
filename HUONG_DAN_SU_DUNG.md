@@ -76,6 +76,29 @@ Hệ thống cho phép người dùng chủ động gắn nhãn mục đích chi
 - Yêu cầu xác nhận: Người dùng bấm **"Xác Nhận Xóa"** (nút màu đỏ nổi bật) để xóa vĩnh viễn, hoặc bấm **"Hủy Bỏ"** để giữ lại.
 - Dữ liệu tổng chi tiêu và số tiền đã chi hôm nay của thẻ sẽ tự động được hoàn lại chính xác.
 
+### 3.6. Quét hóa đơn tự động bằng AI (OCR Receipt Scanner):
+- Bấm nút **📸 Quét Hóa Đơn AI** trên thanh tiêu đề Lịch sử giao dịch hoặc ngay trên đầu Modal **Nhập Giao Dịch Mới**.
+- **3 Chế độ nhập ảnh linh hoạt**:
+  1. 📸 **Chụp ảnh trực tiếp bằng Camera (Live Viewfinder)**:
+     - Mở trực tiếp khung ngắm camera/webcam với giao diện HUD AI hiện đại, có 4 góc ngắm và đèn quét laser.
+     - Nút **"Bấm Chụp & Quét AI"**: Chụp tức thì khung hình hiện tại và bắt đầu bóc tách thông minh.
+     - Hỗ trợ nút **"Đổi Camera"** (chuyển đổi linh hoạt giữa camera trước và camera sau/góc rộng).
+  2. 📱 **Mở máy ảnh gốc thiết bị (Native Camera)**:
+     - Trên điện thoại (iOS / Android), bấm **"Máy Ảnh Gốc"** sẽ mở thẳng ứng dụng máy ảnh chất lượng cao của điện thoại để người dùng bấm chụp sắc nét nhất.
+  3. 📁 **Tải ảnh có sẵn từ máy hoặc dùng mẫu 1-click**:
+     - Chọn ảnh từ thư viện thiết bị (PNG, JPG, WebP) hoặc kéo thả trực tiếp.
+     - Tự động nén & cân chỉnh độ nét qua Canvas trước khi gửi để tối ưu tốc độ nhận diện (< 3 giây).
+     - 4 mẫu hóa đơn thực tế có sẵn (Highlands Coffee, Siêu thị WinMart, Cây xăng Petrolimex, Rạp CGV).
+- **Trí tuệ nhân tạo (AI Vision) tự động nhận diện**:
+  1. Tên điểm bán / Cửa hàng (Merchant name).
+  2. Tổng số tiền thanh toán (tự động quy đổi và format chuẩn VNĐ).
+  3. Phân loại danh mục tự động (Ăn uống, Mua sắm, Di chuyển, Công nghệ, Giải trí).
+  4. Ngày và giờ phát sinh giao dịch.
+  5. **Gợi ý thẻ thông minh**: Tự động tìm kiếm và đề xuất thẻ ngân hàng có mục đích chi tiêu tương ứng (ví dụ: hóa đơn cà phê tự chọn thẻ có nhãn *🍔 Chuyên Ăn uống*) để tối ưu quyền lợi hoàn tiền.
+- **Thao tác nhanh**:
+  - Bấm **"✨ Điền Vào Form Giao Dịch"**: Tự động chuyển toàn bộ dữ liệu đã quét vào form thêm giao dịch.
+  - Bấm **"Lưu Giao Dịch Ngay"**: Lưu trực tiếp khoản chi vào hệ thống chỉ với một nút bấm.
+
 ---
 
 ## 📊 4. Sự Khác Biệt Giữa Trang "Giao Dịch" và Trang "Thống Kê"

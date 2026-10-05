@@ -8,9 +8,11 @@ import {
   EditTransactionModal,
   DeleteTransactionModal,
   ExpenseAnalyticsModals,
+  ReceiptScannerModal,
   type TransactionItem,
   type CategoryBreakdownItem,
   type TransactionExpenseManagerProps,
+  type AddTransactionPrefill,
 } from '@/features/transactions';
 import styles from './TransactionExpenseManager.module.css';
 
@@ -37,6 +39,8 @@ export function TransactionExpenseManager({
 
   // Modals state
   const [isAddTxModalOpen, setIsAddTxModalOpen] = useState(false);
+  const [isReceiptScannerOpen, setIsReceiptScannerOpen] = useState(false);
+  const [scannedPrefill, setScannedPrefill] = useState<AddTransactionPrefill | null>(null);
   const [txToEdit, setTxToEdit] = useState<TransactionItem | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [txToDelete, setTxToDelete] = useState<TransactionItem | null>(null);
@@ -221,7 +225,11 @@ export function TransactionExpenseManager({
       filteredExpense={filteredExpense}
       filteredIncome={filteredIncome}
       activeTab={activeTab}
-      onOpenAddTxModal={() => setIsAddTxModalOpen(true)}
+      onOpenAddTxModal={() => {
+        setScannedPrefill(null);
+        setIsAddTxModalOpen(true);
+      }}
+      onOpenReceiptScanner={() => setIsReceiptScannerOpen(true)}
       onOpenExportReport={onOpenExportReport}
       onOpenImportSheet={onOpenImportSheet}
       onSelectTransaction={onSelectTransaction}
@@ -258,11 +266,16 @@ export function TransactionExpenseManager({
       {/* 3. Add Transaction Modal */}
       <AddTransactionModal
         isOpen={isAddTxModalOpen}
-        onClose={() => setIsAddTxModalOpen(false)}
+        onClose={() => {
+          setIsAddTxModalOpen(false);
+          setScannedPrefill(null);
+        }}
         cards={cards}
         onAddTransaction={onAddTransaction}
         onToast={onToast}
         initialCategory={addTxCategory}
+        prefillData={scannedPrefill}
+        onOpenReceiptScanner={() => setIsReceiptScannerOpen(true)}
       />
 
       {/* 4. Analytics Modals */}
@@ -317,6 +330,29 @@ export function TransactionExpenseManager({
             onDeleteTransaction(txToDelete);
           }
         }}
+      />
+
+      {/* 7. OCR AI Receipt Scanner Modal */}
+      <ReceiptScannerModal
+        isOpen={isReceiptScannerOpen}
+        onClose={() => setIsReceiptScannerOpen(false)}
+        cards={cards}
+        onApplyToForm={(scanned) => {
+          setScannedPrefill({
+            merchant: scanned.merchant,
+            amount: scanned.amount,
+            category: scanned.category,
+            cardId: scanned.suggestedCardId,
+          });
+          setAddTxCategory(scanned.category);
+          setIsReceiptScannerOpen(false);
+          setIsAddTxModalOpen(true);
+        }}
+        onQuickSaveTransaction={(newTx) => {
+          onAddTransaction(newTx);
+          setIsReceiptScannerOpen(false);
+        }}
+        onToast={onToast}
       />
     </div>
   );

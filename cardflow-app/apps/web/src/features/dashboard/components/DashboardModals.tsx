@@ -261,6 +261,7 @@ export function DashboardModals({
             justifyContent: 'center',
             padding: '16px',
             boxSizing: 'border-box',
+            overflowY: 'auto',
           }}
           onClick={onCloseTxDetail}
         >
@@ -268,6 +269,8 @@ export function DashboardModals({
             style={{
               width: '100%',
               maxWidth: '460px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               background: 'linear-gradient(180deg, #0f172a 0%, #090d16 100%)',
               border: '1px solid rgba(56, 189, 248, 0.35)',
               borderRadius: '24px',
@@ -275,6 +278,7 @@ export function DashboardModals({
               boxShadow: '0 25px 60px rgba(0,0,0,0.8), 0 0 30px rgba(56, 189, 248, 0.15)',
               position: 'relative',
               boxSizing: 'border-box',
+              margin: 'auto',
             }}
             onClick={(e) => e.stopPropagation()}
           >

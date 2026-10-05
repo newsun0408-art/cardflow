@@ -1,14 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   FileAddOutlined,
   CheckCircleFilled,
   CloseOutlined,
+  ScanOutlined,
 } from '@ant-design/icons';
 import type { CardDataModel } from '@/app/_components/AddCardModal';
 import type { TransactionItem } from '../types';
 import styles from '@/app/_components/TransactionExpenseManager.module.css';
+
+export interface AddTransactionPrefill {
+  merchant?: string;
+  amount?: number;
+  category?: TransactionItem['category'];
+  cardId?: string;
+}
 
 interface AddTransactionModalProps {
   isOpen: boolean;
@@ -17,6 +25,8 @@ interface AddTransactionModalProps {
   onAddTransaction: (newTx: Omit<TransactionItem, 'id' | 'referenceId' | 'status'>) => void;
   onToast: (msg: string) => void;
   initialCategory?: TransactionItem['category'];
+  prefillData?: AddTransactionPrefill | null;
+  onOpenReceiptScanner?: () => void;
 }
 
 // Hàm đọc số tiền thành chữ tiếng Việt
@@ -80,12 +90,26 @@ export function AddTransactionModal({
   onAddTransaction,
   onToast,
   initialCategory = 'dining',
+  prefillData,
+  onOpenReceiptScanner,
 }: AddTransactionModalProps) {
   const [txType, setTxType] = useState<'expense' | 'income'>('expense');
   const [txAmount, setTxAmount] = useState('');
   const [txMerchant, setTxMerchant] = useState('');
   const [txCategory, setTxCategory] = useState<TransactionItem['category']>(initialCategory);
   const [txCardId, setTxCardId] = useState(cards[0]?.id || 'card-1');
+
+  // Tự động điền dữ liệu khi người dùng quét hóa đơn thành công
+  useEffect(() => {
+    if (prefillData) {
+      if (prefillData.merchant) setTxMerchant(prefillData.merchant);
+      if (prefillData.amount && prefillData.amount > 0) {
+        setTxAmount(`${prefillData.amount.toLocaleString('vi-VN')} VNĐ`);
+      }
+      if (prefillData.category) setTxCategory(prefillData.category);
+      if (prefillData.cardId) setTxCardId(prefillData.cardId);
+    }
+  }, [prefillData]);
 
   if (!isOpen) return null;
 
@@ -186,6 +210,33 @@ export function AddTransactionModal({
             <CloseOutlined />
           </button>
         </div>
+
+        {/* Nút Gọi Quét Hóa Đơn AI */}
+        {onOpenReceiptScanner && (
+          <button
+            type="button"
+            onClick={onOpenReceiptScanner}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '10px 14px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.15) 0%, rgba(2, 132, 199, 0.25) 100%)',
+              border: '1px solid rgba(56, 189, 248, 0.4)',
+              color: '#38bdf8',
+              fontWeight: 700,
+              fontSize: '13px',
+              cursor: 'pointer',
+              boxShadow: '0 0 15px rgba(56, 189, 248, 0.15)',
+              transition: 'all 0.2s',
+            }}
+          >
+            <ScanOutlined style={{ fontSize: '16px' }} />
+            <span>Quét Hóa Đơn Bằng AI (Tự động điền)</span>
+          </button>
+        )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>

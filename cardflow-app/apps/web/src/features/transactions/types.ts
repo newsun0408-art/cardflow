@@ -14,6 +14,7 @@ export interface TransactionItem {
   time: string;
   status: 'Thành công' | 'Đang xử lý' | 'Thất bại';
   referenceId: string;
+  receiptImage?: string; // Data URL hoặc đường dẫn ảnh hóa đơn đã quét / đính kèm
 }
 
 export interface CategoryBreakdownItem {
@@ -34,6 +35,7 @@ export interface TransactionExpenseManagerProps {
   isBalanceHidden: boolean;
   onToggleBalance: () => void;
   onAddTransaction: (newTx: Omit<TransactionItem, 'id' | 'referenceId' | 'status'>) => void;
+  onAddBatchTransactions?: (newTxs: Omit<TransactionItem, 'id' | 'referenceId' | 'status'>[]) => void;
   onOpenExportReport: () => void;
   onOpenImportSheet?: () => void;
   onToast: (msg: string) => void;
@@ -41,4 +43,6 @@ export interface TransactionExpenseManagerProps {
   onSelectTransaction?: (tx: TransactionItem) => void;
   onEditTransaction?: (tx: TransactionItem) => void;
   onDeleteTransaction?: (tx: TransactionItem) => void;
+  autoOpenScanner?: boolean;
+  onResetAutoOpenScanner?: () => void;
 }

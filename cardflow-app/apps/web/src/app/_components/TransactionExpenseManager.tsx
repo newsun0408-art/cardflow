@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   ExpenseCharts,
   TransactionFeed,
@@ -24,6 +24,7 @@ export function TransactionExpenseManager({
   isBalanceHidden,
   onToggleBalance,
   onAddTransaction,
+  onAddBatchTransactions,
   onOpenExportReport,
   onOpenImportSheet,
   onToast,
@@ -31,6 +32,8 @@ export function TransactionExpenseManager({
   onSelectTransaction,
   onEditTransaction,
   onDeleteTransaction,
+  autoOpenScanner,
+  onResetAutoOpenScanner,
 }: TransactionExpenseManagerProps) {
   // Navigation / Date state
   const [currentMonthIndex, setCurrentMonthIndex] = useState(0);
@@ -40,6 +43,15 @@ export function TransactionExpenseManager({
   // Modals state
   const [isAddTxModalOpen, setIsAddTxModalOpen] = useState(false);
   const [isReceiptScannerOpen, setIsReceiptScannerOpen] = useState(false);
+
+  // Auto-open scanner if triggered from Overview tab
+  useEffect(() => {
+    if (autoOpenScanner) {
+      setIsReceiptScannerOpen(true);
+      onResetAutoOpenScanner?.();
+    }
+  }, [autoOpenScanner, onResetAutoOpenScanner]);
+
   const [scannedPrefill, setScannedPrefill] = useState<AddTransactionPrefill | null>(null);
   const [txToEdit, setTxToEdit] = useState<TransactionItem | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -343,6 +355,7 @@ export function TransactionExpenseManager({
             amount: scanned.amount,
             category: scanned.category,
             cardId: scanned.suggestedCardId,
+            receiptImage: scanned.receiptPreviewUrl,
           });
           setAddTxCategory(scanned.category);
           setIsReceiptScannerOpen(false);
@@ -350,6 +363,14 @@ export function TransactionExpenseManager({
         }}
         onQuickSaveTransaction={(newTx) => {
           onAddTransaction(newTx);
+          setIsReceiptScannerOpen(false);
+        }}
+        onQuickSaveBatchTransactions={(newTxs) => {
+          if (onAddBatchTransactions) {
+            onAddBatchTransactions(newTxs);
+          } else {
+            newTxs.forEach((tx) => onAddTransaction(tx));
+          }
           setIsReceiptScannerOpen(false);
         }}
         onToast={onToast}

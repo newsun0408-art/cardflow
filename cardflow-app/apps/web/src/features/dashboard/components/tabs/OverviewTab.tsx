@@ -8,11 +8,13 @@ import {
   CarOutlined,
   LaptopOutlined,
   DollarOutlined,
+  ScanOutlined,
 } from '@ant-design/icons';
 import { PersonalCard3D } from '@/app/_components/PersonalCard3D';
 import { CardQuickControls } from '@/app/_components/CardQuickControls';
 import { CardBalanceCard } from '@/app/_components/CardBalanceCard';
 import type { CardDataModel, TransactionItem } from '../../types';
+import { formatTransactionDate } from '@/features/transactions';
 
 interface OverviewTabProps {
   cards: CardDataModel[];
@@ -20,6 +22,7 @@ interface OverviewTabProps {
   activeCardId: string;
   onSelectCard: (id: string) => void;
   onOpenAddCard: () => void;
+  onOpenReceiptScanner?: () => void;
   onToggleLock?: (id: string) => void;
   onDeleteCard?: (id: string) => void;
   onRequestToggleSensitive: (id: string, name: string) => void;
@@ -58,6 +61,7 @@ export function OverviewTab({
   activeCardId,
   onSelectCard,
   onOpenAddCard,
+  onOpenReceiptScanner,
   onToggleLock,
   onDeleteCard,
   onRequestToggleSensitive,
@@ -365,7 +369,32 @@ export function OverviewTab({
         <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '20px', padding: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <div style={{ fontSize: '16px', fontWeight: 800, color: '#ffffff' }}>Giao Dịch Gần Đây</div>
-            <button onClick={onGoToTransactions} style={{ background: 'transparent', border: 'none', color: '#38bdf8', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>Xem tất cả →</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {onOpenReceiptScanner && (
+                <button
+                  type="button"
+                  onClick={onOpenReceiptScanner}
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.15) 0%, rgba(2, 132, 199, 0.25) 100%)',
+                    border: '1px solid rgba(56, 189, 248, 0.4)',
+                    color: '#38bdf8',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    borderRadius: '8px',
+                    padding: '5px 12px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    transition: 'all 0.2s',
+                  }}
+                  title="Quét ảnh chụp màn hình lịch sử giao dịch hoặc chụp trực tiếp"
+                >
+                  <ScanOutlined /> Quét Lịch Sử Giao Dịch
+                </button>
+              )}
+              <button onClick={onGoToTransactions} style={{ background: 'transparent', border: 'none', color: '#38bdf8', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>Xem tất cả →</button>
+            </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -374,8 +403,29 @@ export function OverviewTab({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>{getCategoryIcon(tx.category)}</div>
                   <div>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#ffffff' }}>{tx.merchant}</div>
-                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>{tx.dateDisplay} • {tx.time}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#ffffff' }}>{tx.merchant}</span>
+                      {tx.receiptImage && (
+                        <span
+                          title="Có ảnh hóa đơn scan"
+                          style={{
+                            fontSize: '10px',
+                            background: 'rgba(56, 189, 248, 0.15)',
+                            border: '1px solid rgba(56, 189, 248, 0.3)',
+                            color: '#38bdf8',
+                            padding: '1px 5px',
+                            borderRadius: '4px',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '2px',
+                          }}
+                        >
+                          🧾 Hóa đơn
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>{formatTransactionDate(tx.date, tx.dateDisplay)} • {tx.time}</div>
                   </div>
                 </div>
                 <div style={{ fontSize: '14px', fontWeight: 800, color: tx.amount > 0 ? '#4ade80' : '#f8fafc' }}>

@@ -18,6 +18,7 @@ import {
   checkGoogleConnectionStatusAction,
   getGoogleDriveStatusAction,
 } from '../actions/google-integration';
+import { formatTransactionDate } from '@/features/transactions';
 
 export interface ReportTransactionItem {
   id: string;
@@ -309,7 +310,7 @@ export function ExportReportModal({
         <tr style="border-bottom: 1px solid #e2e8f0;">
           <td style="padding: 10px; text-align: center;">${idx + 1}</td>
           <td style="padding: 10px; font-family: monospace; font-size: 11px;">${tx.referenceId}</td>
-          <td style="padding: 10px;">${tx.dateDisplay} ${tx.time}</td>
+          <td style="padding: 10px;">${formatTransactionDate(tx.date, tx.dateDisplay)} ${tx.time}</td>
           <td style="padding: 10px;">•••• ${tx.cardLast4}</td>
           <td style="padding: 10px; font-weight: 600;">${tx.merchant}</td>
           <td style="padding: 10px;">${tx.categoryLabel}</td>
@@ -597,7 +598,7 @@ export function ExportReportModal({
                     {tx.referenceId}
                   </td>
                   <td style={{ padding: '10px 14px', color: '#cbd5e1' }}>
-                    {tx.dateDisplay} {tx.time}
+                    {formatTransactionDate(tx.date, tx.dateDisplay)} {tx.time}
                   </td>
                   <td style={{ padding: '10px 14px', color: '#94a3b8' }}>
                     •••• {tx.cardLast4}

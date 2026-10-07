@@ -55,11 +55,11 @@ switch ($Command.ToLower()) {
         
         # 2. Start Go backend in a new window
         Write-Host "`n[2/3] Bat Go Backend tren cua so moi (Port 8080)..." -ForegroundColor Yellow
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$rootDir\cardflow-backend'; Write-Host '=== CARDFLOW GO BACKEND (:8080) ===' -ForegroundColor Green; go run -mod=mod ./cmd/api"
+        Start-Process powershell -ArgumentList "-ExecutionPolicy", "Bypass", "-NoExit", "-Command", "Set-Location '$rootDir\cardflow-backend'; Write-Host '=== CARDFLOW GO BACKEND (:8080) ===' -ForegroundColor Green; go run -mod=mod ./cmd/api"
 
         # 3. Start Next.js frontend in a new window
         Write-Host "`n[3/3] Bat Next.js Web Frontend tren cua so moi (Port 3000)..." -ForegroundColor Yellow
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$rootDir\cardflow-app'; Write-Host '=== CARDFLOW WEB FRONTEND (:3000) ===' -ForegroundColor Cyan; pnpm --filter @cardflow-app/web dev"
+        Start-Process powershell -ArgumentList "-ExecutionPolicy", "Bypass", "-NoExit", "-Command", "Set-Location '$rootDir\cardflow-app'; Write-Host '=== CARDFLOW WEB FRONTEND (:3000) ===' -ForegroundColor Cyan; pnpm --filter @cardflow-app/web dev"
 
         Write-Host "`n======================================================================" -ForegroundColor Green
         Write-Host "CARDFLOW FULLSTACK DA KHOI CHAY THANH CONG!" -ForegroundColor Green

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import type { CardDataModel } from '@/app/_components/AddCardModal';
 import type { CardTheme } from '@/app/_components/PersonalCard3D';
 import type { TransactionItem } from '@/features/transactions';
+import { formatTransactionDate } from '@/features/transactions';
 import type { DashboardTab, CardsViewMode } from '../types';
 import type { UserProfile, CardDto } from '@cardflow-app/shared';
 import {
@@ -100,11 +101,11 @@ export const INITIAL_CARDS: CardDataModel[] = [
 ];
 
 export const INITIAL_TRANSACTIONS: TransactionItem[] = [
-  { id: 'tx-101', cardId: 'card-1', cardLast4: '9921', merchant: 'Thế Giới Di Động - Laptop Pro', category: 'tech', categoryLabel: 'Công nghệ', amount: -12500000, type: 'expense', date: '2026-09-22', dateDisplay: 'Hôm nay', time: '14:32', status: 'Thành công', referenceId: 'TXN-9921-88412' },
-  { id: 'tx-102', cardId: 'card-1', cardLast4: '9921', merchant: 'Starbucks Coffee Reserve', category: 'dining', categoryLabel: 'Ăn uống', amount: -185000, type: 'expense', date: '2026-09-22', dateDisplay: 'Hôm nay', time: '09:15', status: 'Thành công', referenceId: 'TXN-9921-88390' },
-  { id: 'tx-103', cardId: 'card-2', cardLast4: '4412', merchant: 'Grab Car - Chuyến đi Q1', category: 'transport', categoryLabel: 'Di chuyển', amount: -145000, type: 'expense', date: '2026-09-22', dateDisplay: 'Hôm nay', time: '08:40', status: 'Thành công', referenceId: 'TXN-4412-10492' },
-  { id: 'tx-104', cardId: 'card-1', cardLast4: '9921', merchant: 'Nạp tiền hoàn tức thời vCard', category: 'refund', categoryLabel: 'Hoàn tiền', amount: 500000, type: 'income', date: '2026-09-21', dateDisplay: 'Hôm qua', time: '18:20', status: 'Thành công', referenceId: 'TXN-9921-77201' },
-  { id: 'tx-105', cardId: 'card-2', cardLast4: '4412', merchant: 'Uniqlo Vincom Landmark', category: 'shopping', categoryLabel: 'Mua sắm', amount: -2350000, type: 'expense', date: '2026-09-21', dateDisplay: 'Hôm qua', time: '16:05', status: 'Thành công', referenceId: 'TXN-4412-09412' },
+  { id: 'tx-101', cardId: 'card-1', cardLast4: '9921', merchant: 'Thế Giới Di Động - Laptop Pro', category: 'tech', categoryLabel: 'Công nghệ', amount: -12500000, type: 'expense', date: '2026-09-22', dateDisplay: '22/09/2026', time: '14:32', status: 'Thành công', referenceId: 'TXN-9921-88412' },
+  { id: 'tx-102', cardId: 'card-1', cardLast4: '9921', merchant: 'Starbucks Coffee Reserve', category: 'dining', categoryLabel: 'Ăn uống', amount: -185000, type: 'expense', date: '2026-09-22', dateDisplay: '22/09/2026', time: '09:15', status: 'Thành công', referenceId: 'TXN-9921-88390' },
+  { id: 'tx-103', cardId: 'card-2', cardLast4: '4412', merchant: 'Grab Car - Chuyến đi Q1', category: 'transport', categoryLabel: 'Di chuyển', amount: -145000, type: 'expense', date: '2026-09-22', dateDisplay: '22/09/2026', time: '08:40', status: 'Thành công', referenceId: 'TXN-4412-10492' },
+  { id: 'tx-104', cardId: 'card-1', cardLast4: '9921', merchant: 'Nạp tiền hoàn tức thời vCard', category: 'refund', categoryLabel: 'Hoàn tiền', amount: 500000, type: 'income', date: '2026-09-21', dateDisplay: '21/09/2026', time: '18:20', status: 'Thành công', referenceId: 'TXN-9921-77201' },
+  { id: 'tx-105', cardId: 'card-2', cardLast4: '4412', merchant: 'Uniqlo Vincom Landmark', category: 'shopping', categoryLabel: 'Mua sắm', amount: -2350000, type: 'expense', date: '2026-09-21', dateDisplay: '21/09/2026', time: '16:05', status: 'Thành công', referenceId: 'TXN-4412-09412' },
   { id: 'tx-106', cardId: 'card-3', cardLast4: '8834', merchant: 'Apple Store Online Store', category: 'tech', categoryLabel: 'Công nghệ', amount: -4590000, type: 'expense', date: '2026-09-20', dateDisplay: '20/09/2026', time: '11:00', status: 'Thành công', referenceId: 'TXN-8834-00129' },
   { id: 'tx-107', cardId: 'card-1', cardLast4: '9921', merchant: 'CGV Cinema Premiere', category: 'dining', categoryLabel: 'Giải trí', amount: -320000, type: 'expense', date: '2026-09-19', dateDisplay: '19/09/2026', time: '20:15', status: 'Thành công', referenceId: 'TXN-9921-65412' },
 ];
@@ -252,7 +253,11 @@ export function useDashboardState() {
         if (savedTxs !== null) {
           const parsedTxs = JSON.parse(savedTxs);
           if (Array.isArray(parsedTxs)) {
-            setTransactions(parsedTxs);
+            const normalizedTxs = parsedTxs.map((t: TransactionItem) => ({
+              ...t,
+              dateDisplay: formatTransactionDate(t.date, t.dateDisplay),
+            }));
+            setTransactions(normalizedTxs);
           }
         }
       } catch {
@@ -361,7 +366,7 @@ export function useDashboardState() {
                 amount: t.type === 'EXPENSE' ? -Math.abs(t.amount) : Math.abs(t.amount),
                 type: t.type === 'EXPENSE' ? 'expense' : 'income',
                 date: datePart,
-                dateDisplay: datePart,
+                dateDisplay: formatTransactionDate(datePart),
                 time: timePart,
                 status: t.status === 'SUCCESS' ? 'Thành công' : 'Đang xử lý',
                 referenceId: `TXN-${t.id.slice(0, 8).toUpperCase()}`,
@@ -590,8 +595,9 @@ export function useDashboardState() {
   const handleAddTransaction = (newTxData: Omit<TransactionItem, 'id' | 'referenceId' | 'status'>) => {
     const newTx: TransactionItem = {
       ...newTxData,
-      id: `tx-${Date.now()}`,
+      id: `tx-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
       referenceId: `TXN-${newTxData.cardLast4}-${Math.floor(10000 + Math.random() * 90000)}`,
+      dateDisplay: formatTransactionDate(newTxData.date, newTxData.dateDisplay),
       status: 'Thành công',
     };
     setTransactions((prev) => [newTx, ...prev]);
@@ -628,11 +634,71 @@ export function useDashboardState() {
     }
   };
 
+  const handleAddBatchTransactions = (newTxsData: Omit<TransactionItem, 'id' | 'referenceId' | 'status'>[]) => {
+    if (!newTxsData || newTxsData.length === 0) return;
+
+    const createdTxs: TransactionItem[] = newTxsData.map((data, idx) => ({
+      ...data,
+      id: `tx-${Date.now()}-${idx}-${Math.floor(100 + Math.random() * 900)}`,
+      referenceId: `TXN-${data.cardLast4}-${Math.floor(10000 + Math.random() * 90000)}`,
+      dateDisplay: formatTransactionDate(data.date, data.dateDisplay),
+      status: 'Thành công',
+    }));
+
+    setTransactions((prev) => [...createdTxs, ...prev]);
+
+    // Update spentToday for respective cards
+    const expensesByCard: Record<string, number> = {};
+    createdTxs.forEach((tx) => {
+      if (tx.type === 'expense') {
+        expensesByCard[tx.cardId] = (expensesByCard[tx.cardId] || 0) + Math.abs(tx.amount);
+      }
+    });
+
+    if (Object.keys(expensesByCard).length > 0) {
+      setCards((prev) =>
+        prev.map((c) => {
+          const added = expensesByCard[c.id];
+          if (added) {
+            return { ...c, spentToday: c.spentToday + added };
+          }
+          return c;
+        })
+      );
+    }
+
+    // Attempt backend sync in background
+    try {
+      const api = createApi();
+      const catReverse: Record<string, string> = {
+        tech: 'TECHNOLOGY',
+        dining: 'FOOD',
+        transport: 'TRANSPORT',
+        housing: 'HOUSING',
+        other: 'OTHER',
+      };
+      createdTxs.forEach((tx) => {
+        createTransaction(api, {
+          cardId: tx.cardId,
+          title: tx.merchant,
+          amount: Math.abs(tx.amount),
+          type: tx.type === 'expense' ? 'EXPENSE' : 'INCOME',
+          category: catReverse[tx.category] || 'OTHER',
+          note: 'Batch Receipt Scan',
+        }).catch(() => { });
+      });
+    } catch { }
+  };
+
   const handleUpdateTransaction = (updatedTx: TransactionItem) => {
-    const oldTx = transactions.find((t) => t.id === updatedTx.id);
+    const normalizedTx: TransactionItem = {
+      ...updatedTx,
+      dateDisplay: formatTransactionDate(updatedTx.date, updatedTx.dateDisplay),
+    };
+    const oldTx = transactions.find((t) => t.id === normalizedTx.id);
 
     setTransactions((prev) =>
-      prev.map((t) => (t.id === updatedTx.id ? updatedTx : t))
+      prev.map((t) => (t.id === normalizedTx.id ? normalizedTx : t))
     );
 
     if (oldTx) {
@@ -974,6 +1040,7 @@ export function useDashboardState() {
     handleUpdateCard,
     handleAddCard,
     handleAddTransaction,
+    handleAddBatchTransactions,
     handleUpdateTransaction,
     handleDeleteTransaction,
     handleProfileSave,

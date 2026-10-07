@@ -3,9 +3,9 @@
 import { createWorker } from 'tesseract.js';
 import path from 'path';
 import fs from 'fs';
-import { parseReceiptOcrText, type ParsedReceiptResult } from '@/features/transactions/utils/receipt-parser';
+import { parseReceiptOcrText, type ParsedReceiptResult, type ParsedTransactionEntry } from '@/features/transactions/utils/receipt-parser';
 
-export type { ParsedReceiptResult };
+export type { ParsedReceiptResult, ParsedTransactionEntry };
 
 function resolveWorkerPath(): string | undefined {
   const candidates = [

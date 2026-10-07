@@ -9,6 +9,7 @@ import {
   CalendarOutlined,
 } from '@ant-design/icons';
 import type { TransactionItem } from '../types';
+import { formatTransactionDate } from '../dateUtils';
 import styles from '@/app/_components/TransactionExpenseManager.module.css';
 
 interface DeleteTransactionModalProps {
@@ -146,7 +147,7 @@ export function DeleteTransactionModal({
               <CalendarOutlined /> Thời gian
             </span>
             <span style={{ fontSize: '12px', color: '#cbd5e1' }}>
-              {transaction.dateDisplay || transaction.date} lúc {transaction.time}
+              {formatTransactionDate(transaction.date, transaction.dateDisplay)} lúc {transaction.time}
             </span>
           </div>
 

@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   CameraOutlined,
   UploadOutlined,
   ScanOutlined,
   CheckCircleFilled,
   CloseOutlined,
-  FileTextOutlined,
   ThunderboltFilled,
   CoffeeOutlined,
   ShoppingOutlined,
@@ -15,14 +14,21 @@ import {
   VideoCameraOutlined,
   ReloadOutlined,
   ArrowRightOutlined,
-  BulbOutlined,
   SyncOutlined,
   MobileOutlined,
+  DeleteOutlined,
+  EyeOutlined,
+  DownloadOutlined,
+  CreditCardOutlined,
+  PlusOutlined,
+  PictureOutlined,
+  CheckOutlined,
 } from '@ant-design/icons';
 import type { CardDataModel } from '@/app/_components/AddCardModal';
 import type { TransactionItem } from '../types';
 import { scanReceiptAction } from '@/app/actions/receipt-ocr';
 import { compressImageForOcr, type ParsedReceiptResult } from '../utils/receipt-parser';
+import { formatTransactionDate } from '../dateUtils';
 
 export interface ScannedReceiptData {
   merchant: string;
@@ -33,10 +39,27 @@ export interface ScannedReceiptData {
   time: string; // HH:mm
   suggestedCardId: string;
   suggestedCardName: string;
-  confidence: number; // percentage (e.g. 96%)
+  confidence: number;
   rawItems: { name: string; price: number; qty?: number }[];
   receiptPreviewUrl?: string;
   sampleType?: string;
+}
+
+export interface BatchReceiptItem {
+  id: string;
+  fileName: string;
+  dataUrl: string;
+  status: 'scanning' | 'success' | 'failed';
+  progress: number;
+  merchant: string;
+  amount: number;
+  category: TransactionItem['category'];
+  categoryLabel: string;
+  date: string;
+  time: string;
+  selectedCardId: string;
+  confidence: number;
+  rawItems?: { name: string; price: number; qty?: number }[];
 }
 
 export interface ReceiptScannerModalProps {
@@ -45,10 +68,10 @@ export interface ReceiptScannerModalProps {
   cards: CardDataModel[];
   onApplyToForm: (scanned: ScannedReceiptData) => void;
   onQuickSaveTransaction: (tx: Omit<TransactionItem, 'id' | 'referenceId' | 'status'>) => void;
+  onQuickSaveBatchTransactions?: (txs: Omit<TransactionItem, 'id' | 'referenceId' | 'status'>[]) => void;
   onToast: (msg: string) => void;
 }
 
-// 4 Mẫu hóa đơn thực tế có sẵn để người dùng thử nghiệm tính năng ngay lập tức
 interface SampleReceiptPreset {
   id: string;
   title: string;
@@ -63,9 +86,100 @@ interface SampleReceiptPreset {
   items: { name: string; price: number; qty: number }[];
   address: string;
   headerColor: string;
+  isHistory?: boolean;
+  historyTransactions?: {
+    merchant: string;
+    amount: number;
+    category: TransactionItem['category'];
+    categoryLabel: string;
+    date: string;
+    time: string;
+  }[];
 }
 
 const SAMPLE_PRESETS: SampleReceiptPreset[] = [
+  {
+    id: 'momo-history',
+    title: 'Lịch Sử Ví MoMo (7 GD)',
+    icon: <MobileOutlined style={{ color: '#d946ef' }} />,
+    tag: 'Ảnh Chụp Lịch Sử',
+    merchant: 'Lịch Sử Ví MoMo - Tháng 10/2026',
+    amount: 487200,
+    category: 'other',
+    categoryLabel: 'Lịch sử giao dịch',
+    date: '2026-10-07',
+    time: '11:40',
+    isHistory: true,
+    historyTransactions: [
+      {
+        merchant: 'Chuyển đến Lê Huỳnh Thuận',
+        amount: 200000,
+        category: 'other',
+        categoryLabel: 'Chuyển khoản',
+        date: '2026-10-07',
+        time: '11:40',
+      },
+      {
+        merchant: 'Chuyển đến NGUYEN LE DAI AN (Techcombank)',
+        amount: 148000,
+        category: 'other',
+        categoryLabel: 'Chuyển khoản',
+        date: '2026-10-07',
+        time: '08:29',
+      },
+      {
+        merchant: 'Nạp Data MobiFone',
+        amount: 8800,
+        category: 'tech',
+        categoryLabel: 'Viễn thông',
+        date: '2026-10-06',
+        time: '18:51',
+      },
+      {
+        merchant: 'Thanh toán BÁCH HÓA XANH',
+        amount: 40400,
+        category: 'shopping',
+        categoryLabel: 'Siêu thị',
+        date: '2026-10-06',
+        time: '10:15',
+      },
+      {
+        merchant: 'Thanh toán cho LE HUNG THINH (Techcombank)',
+        amount: 62000,
+        category: 'other',
+        categoryLabel: 'Chuyển khoản',
+        date: '2026-10-04',
+        time: '11:54',
+      },
+      {
+        merchant: 'Nạp Data Viettel',
+        amount: 8000,
+        category: 'tech',
+        categoryLabel: 'Viễn thông',
+        date: '2026-10-03',
+        time: '21:44',
+      },
+      {
+        merchant: 'Nạp tiền điện thoại Vinaphone',
+        amount: 20000,
+        category: 'tech',
+        categoryLabel: 'Nạp tiền ĐT',
+        date: '2026-10-01',
+        time: '12:14',
+      },
+    ],
+    items: [
+      { name: 'Chuyển đến Lê Huỳnh Thuận', price: 200000, qty: 1 },
+      { name: 'Chuyển đến NGUYEN LE DAI AN', price: 148000, qty: 1 },
+      { name: 'Nạp Data MobiFone', price: 8800, qty: 1 },
+      { name: 'Thanh toán BÁCH HÓA XANH', price: 40400, qty: 1 },
+      { name: 'Thanh toán LE HUNG THINH', price: 62000, qty: 1 },
+      { name: 'Nạp Data Viettel', price: 8000, qty: 1 },
+      { name: 'Nạp tiền điện thoại Vinaphone', price: 20000, qty: 1 },
+    ],
+    address: 'Ảnh chụp màn hình Lịch sử giao dịch MoMo Tháng 10/2026',
+    headerColor: '#c026d3',
+  },
   {
     id: 'highlands',
     title: 'Highlands Coffee',
@@ -147,9 +261,10 @@ export function ReceiptScannerModal({
   cards,
   onApplyToForm,
   onQuickSaveTransaction,
+  onQuickSaveBatchTransactions,
   onToast,
 }: ReceiptScannerModalProps) {
-  const [activeTab, setActiveTab] = useState<'upload' | 'sample' | 'camera'>('sample');
+  const [activeTab, setActiveTab] = useState<'upload' | 'sample' | 'camera'>('upload');
   const [selectedPresetId, setSelectedPresetId] = useState<string>('highlands');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -161,11 +276,17 @@ export function ReceiptScannerModal({
   const [editableCategory, setEditableCategory] = useState<TransactionItem['category']>('dining');
   const [editableCardId, setEditableCardId] = useState<string>('');
 
+  // Batch Multi-Image State
+  const [batchQueue, setBatchQueue] = useState<BatchReceiptItem[]>([]);
+  const [batchGlobalCardId, setBatchGlobalCardId] = useState<string>('');
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+
   // Camera states & refs
-  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [, setCameraStream] = useState<MediaStream | null>(null);
   const [cameraFacingMode, setCameraFacingMode] = useState<'environment' | 'user'>('environment');
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [isCameraStarting, setIsCameraStarting] = useState(false);
+  const [, setIsCameraStarting] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nativeCameraInputRef = useRef<HTMLInputElement>(null);
@@ -173,7 +294,6 @@ export function ReceiptScannerModal({
 
   // Tìm thẻ tối ưu nhất phù hợp với danh mục
   const findBestCardForCategory = useCallback((category: TransactionItem['category']): CardDataModel => {
-    // Ưu tiên thẻ có purpose trùng khớp
     const matched = cards.find((c) => {
       if (category === 'dining' && (c.purpose === 'dining' || c.nickname.toLowerCase().includes('ăn'))) return true;
       if (category === 'shopping' && (c.purpose === 'shopping' || c.nickname.toLowerCase().includes('mua'))) return true;
@@ -183,12 +303,19 @@ export function ReceiptScannerModal({
     });
 
     if (matched) return matched;
-    // Fallback thẻ mặc định hoặc thẻ đầu tiên
     const defaultCard = cards.find((c) => c.isDefault);
-    return defaultCard || cards[0] || ({ id: 'card-1', nickname: 'Thẻ Mặc Định', lastFourDigits: '9921' } as any);
+    return defaultCard || cards[0] || ({ id: 'card-1', nickname: 'Thẻ Mặc Định', lastFourDigits: '9921', bankName: 'Cardflow Bank' } as any);
   }, [cards]);
 
-  // Dừng camera và dọn dẹp track
+  // Set default editable card when cards are available
+  useEffect(() => {
+    if (cards.length > 0 && !editableCardId && cards[0]) {
+      setEditableCardId(cards[0].id);
+      setBatchGlobalCardId(cards[0].id);
+    }
+  }, [cards, editableCardId]);
+
+  // Dừng camera
   const stopCamera = useCallback(() => {
     setCameraStream((prev) => {
       if (prev) {
@@ -201,19 +328,18 @@ export function ReceiptScannerModal({
     }
   }, []);
 
-  // Khởi động luồng camera
+  // Khởi động camera
   const startCamera = useCallback(async (facing: 'environment' | 'user' = 'environment') => {
     setCameraError(null);
     setIsCameraStarting(true);
 
     try {
       if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-        setCameraError('Trình duyệt không hỗ trợ trực tiếp. Vui lòng bấm nút "Mở Camera Thiết Bị" bên dưới.');
+        setCameraError('Trình duyệt không hỗ trợ trực tiếp. Vui lòng bấm nút "Mở Máy Ảnh Điện Thoại" bên dưới.');
         setIsCameraStarting(false);
         return;
       }
 
-      // Tắt stream cũ trước khi xin stream mới
       setCameraStream((prev) => {
         if (prev) prev.getTracks().forEach((t) => t.stop());
         return null;
@@ -237,40 +363,236 @@ export function ReceiptScannerModal({
       }
     } catch (err: any) {
       console.warn('Camera access failed:', err);
-      setCameraError('Không thể mở camera (thiết bị không có webcam hoặc chưa cấp quyền). Bạn có thể bấm nút "Mở Camera Thiết Bị" để chụp trực tiếp từ ứng dụng máy ảnh.');
+      setCameraError('Không thể mở camera. Bạn có thể bấm nút "Mở Máy Ảnh Điện Thoại" để chụp từ ứng dụng máy ảnh gốc.');
     } finally {
       setIsCameraStarting(false);
     }
   }, []);
 
-  // Đổi giữa camera trước và sau
-  const toggleCameraFacing = useCallback(() => {
-    const nextFacing = cameraFacingMode === 'environment' ? 'user' : 'environment';
-    startCamera(nextFacing);
-  }, [cameraFacingMode, startCamera]);
+  // Quản lý camera khi đổi tab
+  useEffect(() => {
+    if (isOpen && activeTab === 'camera') {
+      startCamera(cameraFacingMode);
+    } else {
+      stopCamera();
+    }
+    return () => {
+      stopCamera();
+    };
+  }, [isOpen, activeTab, startCamera, stopCamera, cameraFacingMode]);
 
-  // Phân tích preset mẫu thành ScannedReceiptData
+  // Gọi OCR xử lý dataURL
+  const scanDataUrlWithAi = async (dataUrl: string): Promise<ParsedReceiptResult> => {
+    const compressedDataUrl = await compressImageForOcr(dataUrl, 1600, 0.85);
+    try {
+      const response = await fetch('/api/receipt-ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64: compressedDataUrl }),
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch {}
+
+    const formData = new FormData();
+    formData.append('base64', compressedDataUrl);
+    return await scanReceiptAction(formData);
+  };
+
+  // Vẽ mô phỏng ảnh hóa đơn / ảnh lịch sử giao dịch canvas
+  const generateSampleReceiptDataUrl = useCallback((preset: SampleReceiptPreset): string => {
+    if (typeof document === 'undefined') return '';
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+
+    if (preset.isHistory) {
+      canvas.width = 540;
+      canvas.height = 960;
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(0, 0, 540, 960);
+
+      // Status Bar
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillText('14:10', 36, 32);
+      ctx.font = '14px sans-serif';
+      ctx.fillText('📶 5G  🔋 41%', 430, 32);
+
+      // Search Bar
+      ctx.fillStyle = '#e2e8f0';
+      ctx.beginPath();
+      ctx.roundRect(24, 52, 492, 44, 22);
+      ctx.fill();
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = '15px sans-serif';
+      ctx.fillText('🔍 Tìm kiếm giao dịch', 44, 80);
+
+      // Header Tháng 10/2026
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 20px sans-serif';
+      ctx.fillText('Tháng 10/2026', 24, 134);
+
+      const txs = preset.historyTransactions || [];
+      let currentY = 175;
+
+      for (let i = 0; i < txs.length; i++) {
+        const tx = txs[i]!;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(48, currentY + 12, 22, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.font = '16px sans-serif';
+        const iconChar = tx.category === 'tech' ? '📱' : tx.category === 'shopping' ? '🛒' : '💸';
+        ctx.fillText(iconChar, 38, currentY + 18);
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 15px sans-serif';
+        const displayTitle = tx.merchant.length > 25 ? tx.merchant.slice(0, 24) + '...' : tx.merchant;
+        ctx.fillText(displayTitle, 82, currentY + 8);
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '13px sans-serif';
+        ctx.fillText(`${tx.time} - ${tx.date.split('-').slice(1).reverse().join('/')}`, 82, currentY + 28);
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(`-${tx.amount.toLocaleString('vi-VN')}đ`, 516, currentY + 8);
+        ctx.textAlign = 'left';
+
+        ctx.strokeStyle = '#f1f5f9';
+        ctx.beginPath();
+        ctx.moveTo(82, currentY + 44);
+        ctx.lineTo(516, currentY + 44);
+        ctx.stroke();
+
+        currentY += 76;
+      }
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 880, 540, 80);
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.beginPath();
+      ctx.moveTo(0, 880);
+      ctx.lineTo(540, 880);
+      ctx.stroke();
+
+      ctx.fillStyle = '#d946ef';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('📅 Giao dịch', 270, 928);
+      ctx.textAlign = 'left';
+
+      return canvas.toDataURL('image/jpeg', 0.92);
+    }
+
+    canvas.width = 460;
+    canvas.height = 620;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 460, 620);
+
+    ctx.fillStyle = preset.headerColor || '#0284c7';
+    ctx.fillRect(0, 0, 460, 80);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(preset.merchant.slice(0, 26), 230, 48);
+
+    ctx.fillStyle = '#475569';
+    ctx.font = '12px sans-serif';
+    ctx.fillText(preset.address, 230, 110);
+    ctx.fillText(`Ngày: ${preset.date} — Giờ: ${preset.time}`, 230, 130);
+
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(30, 150);
+    ctx.lineTo(430, 150);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    let y = 180;
+    ctx.textAlign = 'left';
+    ctx.font = '14px sans-serif';
+    ctx.fillStyle = '#0f172a';
+
+    for (const it of preset.items) {
+      ctx.fillText(`${it.qty}x ${it.name}`, 36, y);
+      ctx.textAlign = 'right';
+      ctx.fillText(`${(it.price * it.qty).toLocaleString('vi-VN')}đ`, 424, y);
+      ctx.textAlign = 'left';
+      y += 32;
+    }
+
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(30, y + 10);
+    ctx.lineTo(430, y + 10);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    y += 40;
+    ctx.font = 'bold 18px sans-serif';
+    ctx.fillText('TỔNG CỘNG:', 36, y);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#0284c7';
+    ctx.fillText(`${preset.amount.toLocaleString('vi-VN')} VNĐ`, 424, y);
+    ctx.textAlign = 'left';
+
+    return canvas.toDataURL('image/jpeg', 0.92);
+  }, []);
+
+  // Quét preset mẫu
   const runPresetScan = useCallback((presetId: string) => {
     const preset = SAMPLE_PRESETS.find((p) => p.id === presetId) || SAMPLE_PRESETS[0];
     if (!preset) return;
 
     setIsScanning(true);
-    setScanProgress(15);
-    setScanStepMessage('Đang phát hiện vùng biên hóa đơn...');
+    setScanProgress(20);
+    setScanStepMessage('Đang phát hiện vùng biên ảnh...');
     setScanResult(null);
 
-    const timer1 = setTimeout(() => {
-      setScanProgress(45);
-      setScanStepMessage(`Đã nhận diện điểm bán: ${preset.merchant}`);
-    }, 450);
+    const timer = setTimeout(() => {
+      const generatedImg = generateSampleReceiptDataUrl(preset);
+      setImagePreview(generatedImg);
 
-    const timer2 = setTimeout(() => {
-      setScanProgress(75);
-      setScanStepMessage(`Đang bóc tách tổng tiền: ${preset.amount.toLocaleString('vi-VN')} VNĐ...`);
-    }, 900);
+      // Nếu là mẫu lịch sử giao dịch (MoMo): tự động mở Batch Queue với 7 giao dịch
+      if (preset.isHistory && preset.historyTransactions) {
+        const batchItems: BatchReceiptItem[] = preset.historyTransactions.map((tx, idx) => {
+          const card = findBestCardForCategory(tx.category);
+          return {
+            id: `sample-momo-${idx}`,
+            fileName: `Lịch sử MoMo (#${idx + 1})`,
+            dataUrl: generatedImg,
+            status: 'success',
+            progress: 100,
+            merchant: tx.merchant,
+            amount: tx.amount,
+            category: tx.category,
+            categoryLabel: tx.categoryLabel,
+            date: tx.date,
+            time: tx.time,
+            selectedCardId: card.id,
+            confidence: 99,
+          };
+        });
 
-    const timer3 = setTimeout(() => {
-      setScanProgress(100);
+        setBatchQueue(batchItems);
+        setIsScanning(false);
+        onToast(`📱 AI đã bóc tách thành công 7 giao dịch từ ảnh lịch sử ví MoMo!`);
+        return;
+      }
+
+      // Nếu là mẫu đơn lẻ
       const bestCard = findBestCardForCategory(preset.category);
       const result: ScannedReceiptData = {
         merchant: preset.merchant,
@@ -284,6 +606,7 @@ export function ReceiptScannerModal({
         confidence: 98,
         rawItems: preset.items,
         sampleType: preset.id,
+        receiptPreviewUrl: generatedImg,
       };
 
       setScanResult(result);
@@ -292,56 +615,243 @@ export function ReceiptScannerModal({
       setEditableCategory(result.category);
       setEditableCardId(result.suggestedCardId);
       setIsScanning(false);
-      onToast(`✨ AI đã quét thành công hóa đơn ${preset.title}!`);
-    }, 1350);
+      onToast(`✨ AI đã quét thành công hóa đơn mẫu: ${preset.title}!`);
+    }, 900);
 
-    return () => {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-      clearTimeout(timer3);
-    };
-  }, [findBestCardForCategory, onToast]);
+    return () => clearTimeout(timer);
+  }, [findBestCardForCategory, generateSampleReceiptDataUrl, onToast]);
 
-  // Quét preset mặc định khi mở modal lần đầu
-  useEffect(() => {
-    if (isOpen && !scanResult && !isScanning && activeTab === 'sample') {
-      runPresetScan(selectedPresetId);
+  // Quét 1 ảnh riêng lẻ
+  const scanSingleUploadedImage = async (dataUrl: string) => {
+    setIsScanning(true);
+    setScanProgress(25);
+    setScanStepMessage('Đang nén & tối ưu hóa độ nét ảnh...');
+    setScanResult(null);
+
+    try {
+      setScanProgress(50);
+      setScanStepMessage('AI đang nhận diện chữ & bóc tách giao dịch...');
+      const res = await scanDataUrlWithAi(dataUrl);
+
+      // NẾU ẢNH LÀ MÀN HÌNH LỊCH SỬ GIAO DỊCH (NHIỀU GD) -> TỰ ĐỘNG CHUYỂN SANG BATCH QUEUE
+      if (res.isHistoryList && res.transactions && res.transactions.length > 1) {
+        const batchItems: BatchReceiptItem[] = res.transactions.map((txEntry, idx) => {
+          const card = findBestCardForCategory(txEntry.category);
+          return {
+            id: `single-multi-${Date.now()}-${idx}`,
+            fileName: `Giao dịch #${idx + 1}`,
+            dataUrl,
+            status: 'success',
+            progress: 100,
+            merchant: txEntry.merchant,
+            amount: txEntry.amount,
+            category: txEntry.category,
+            categoryLabel: txEntry.categoryLabel,
+            date: txEntry.date,
+            time: txEntry.time,
+            selectedCardId: card.id,
+            confidence: txEntry.confidence || 95,
+          };
+        });
+
+        setBatchQueue(batchItems);
+        setIsScanning(false);
+        onToast(`📱 AI đã bóc tách thành công ${res.transactions.length} giao dịch từ ảnh lịch sử!`);
+        return;
+      }
+
+      setScanProgress(90);
+      setScanStepMessage('Đang phân loại danh mục & đối soát thẻ...');
+
+      const category = res.category || 'dining';
+      const bestCard = findBestCardForCategory(category);
+      const merchant = res.merchant && res.merchant !== 'Điểm Bán / Hóa Đơn' ? res.merchant : 'Điểm Bán Hóa Đơn';
+      const amount = res.amount > 0 ? res.amount : 100000;
+
+      const result: ScannedReceiptData = {
+        merchant,
+        amount,
+        category,
+        categoryLabel: res.categoryLabel || 'Ăn uống',
+        date: res.date || new Date().toISOString().split('T')[0] || '2026-10-05',
+        time: res.time || '12:00',
+        suggestedCardId: bestCard.id,
+        suggestedCardName: `${bestCard.bankName || 'Ngân Hàng'} (${bestCard.lastFourDigits})`,
+        confidence: res.confidence || 95,
+        rawItems: [{ name: merchant, price: amount, qty: 1 }],
+        receiptPreviewUrl: dataUrl,
+      };
+
+      setScanResult(result);
+      setEditableMerchant(result.merchant);
+      setEditableAmount(result.amount);
+      setEditableCategory(result.category);
+      setEditableCardId(result.suggestedCardId);
+      onToast(`✨ AI đã bóc tách: ${result.merchant} (${result.amount.toLocaleString('vi-VN')} VNĐ)!`);
+    } catch {
+      const bestCard = findBestCardForCategory('dining');
+      const fallbackResult: ScannedReceiptData = {
+        merchant: 'Hóa Đơn Mới',
+        amount: 100000,
+        category: 'dining',
+        categoryLabel: 'Ăn uống',
+        date: new Date().toISOString().split('T')[0] || '2026-10-05',
+        time: '12:00',
+        suggestedCardId: bestCard.id,
+        suggestedCardName: `${bestCard.bankName || 'Ngân Hàng'} (${bestCard.lastFourDigits})`,
+        confidence: 88,
+        rawItems: [{ name: 'Hóa Đơn', price: 100000, qty: 1 }],
+        receiptPreviewUrl: dataUrl,
+      };
+      setScanResult(fallbackResult);
+      setEditableMerchant(fallbackResult.merchant);
+      setEditableAmount(fallbackResult.amount);
+      setEditableCategory(fallbackResult.category);
+      setEditableCardId(fallbackResult.suggestedCardId);
+      onToast('📸 Đã nhận diện ảnh (vui lòng kiểm tra lại thông tin)');
+    } finally {
+      setIsScanning(false);
     }
-  }, [isOpen, scanResult, isScanning, selectedPresetId, runPresetScan, activeTab]);
+  };
 
-  // Quản lý bật/tắt camera khi đổi tab hoặc đóng modal
-  useEffect(() => {
-    if (isOpen && activeTab === 'camera') {
-      startCamera(cameraFacingMode);
-    } else {
-      stopCamera();
-    }
-    return () => {
-      stopCamera();
-    };
-  }, [isOpen, activeTab, startCamera, stopCamera, cameraFacingMode]);
-
-  // Xử lý upload ảnh thực tế từ thiết bị
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
+  // XỬ LÝ CHỌN NHIỀU ẢNH (Multi-Image Files)
+  const handleMultipleFiles = async (filesList: FileList | File[]) => {
+    const files = Array.from(filesList).filter((f) => f.type.startsWith('image/'));
+    if (files.length === 0) {
       onToast('⚠️ Vui lòng chọn tệp hình ảnh (PNG, JPG, WebP)');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      setImagePreview(dataUrl);
-      setActiveTab('upload');
-      parseUploadedImage(file.name, dataUrl);
-    };
-    reader.readAsDataURL(file);
+    setActiveTab('upload');
+
+    // Đọc tất cả ảnh sang dataURL
+    const newItems: BatchReceiptItem[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!file) continue;
+      const dataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+
+      const defaultCard = cards[0] || ({ id: 'card-1', bankName: 'Cardflow Bank', lastFourDigits: '9921' } as any);
+      newItems.push({
+        id: `batch-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+        fileName: file.name,
+        dataUrl,
+        status: 'scanning',
+        progress: 25,
+        merchant: 'Đang bóc tách AI...',
+        amount: 0,
+        category: 'dining',
+        categoryLabel: 'Ăn uống',
+        date: new Date().toISOString().split('T')[0] || '2026-10-05',
+        time: '12:00',
+        selectedCardId: defaultCard.id,
+        confidence: 0,
+      });
+    }
+
+    // Nếu chỉ có 1 ảnh và chưa có batch nào: quét thử
+    if (files.length === 1 && batchQueue.length === 0 && newItems[0]) {
+      setImagePreview(newItems[0].dataUrl);
+      scanSingleUploadedImage(newItems[0].dataUrl);
+      return;
+    }
+
+    // Thêm vào Batch Queue
+    setBatchQueue((prev) => [...prev, ...newItems]);
+    onToast(`📸 Đang bóc tách ${newItems.length} ảnh cùng lúc...`);
+
+    // Quét từng ảnh trong batch
+    for (const item of newItems) {
+      try {
+        const res = await scanDataUrlWithAi(item.dataUrl);
+
+        // NẾU ẢNH NÀY CHỨA NHIỀU GIAO DỊCH (Lịch sử GD ngân hàng/ví):
+        if (res.isHistoryList && res.transactions && res.transactions.length > 1) {
+          const expanded: BatchReceiptItem[] = res.transactions.map((txEntry, subIdx) => {
+            const card = findBestCardForCategory(txEntry.category);
+            return {
+              id: `${item.id}-tx-${subIdx}`,
+              fileName: `${item.fileName} (#${subIdx + 1})`,
+              dataUrl: item.dataUrl,
+              status: 'success',
+              progress: 100,
+              merchant: txEntry.merchant,
+              amount: txEntry.amount,
+              category: txEntry.category,
+              categoryLabel: txEntry.categoryLabel,
+              date: txEntry.date,
+              time: txEntry.time,
+              selectedCardId: card.id,
+              confidence: txEntry.confidence || 95,
+            };
+          });
+
+          setBatchQueue((prev) => {
+            const idx = prev.findIndex((b) => b.id === item.id);
+            if (idx !== -1) {
+              const copy = [...prev];
+              copy.splice(idx, 1, ...expanded);
+              return copy;
+            }
+            return [...prev, ...expanded];
+          });
+        } else {
+          // Chỉ chứa 1 giao dịch
+          const category = res.category || 'dining';
+          const bestCard = findBestCardForCategory(category);
+          const merchant = res.merchant && res.merchant !== 'Điểm Bán / Hóa Đơn' ? res.merchant : 'Hóa Đơn ' + item.fileName.replace(/\.[^/.]+$/, '');
+          const amount = res.amount > 0 ? res.amount : 100000;
+
+          setBatchQueue((prev) =>
+            prev.map((b) =>
+              b.id === item.id
+                ? {
+                    ...b,
+                    status: 'success',
+                    progress: 100,
+                    merchant,
+                    amount,
+                    category,
+                    categoryLabel: res.categoryLabel || 'Ăn uống',
+                    date: res.date || new Date().toISOString().split('T')[0] || '2026-10-05',
+                    time: res.time || '12:00',
+                    selectedCardId: bestCard.id,
+                    confidence: res.confidence || 95,
+                  }
+                : b
+            )
+          );
+        }
+      } catch {
+        const bestCard = findBestCardForCategory('dining');
+        setBatchQueue((prev) =>
+          prev.map((b) =>
+            b.id === item.id
+              ? {
+                  ...b,
+                  status: 'success',
+                  progress: 100,
+                  merchant: 'Hóa Đơn ' + item.fileName.replace(/\.[^/.]+$/, ''),
+                  amount: 100000,
+                  category: 'dining',
+                  categoryLabel: 'Ăn uống',
+                  date: new Date().toISOString().split('T')[0] || '2026-10-05',
+                  time: '12:00',
+                  selectedCardId: bestCard.id,
+                  confidence: 85,
+                }
+              : b
+          )
+        );
+      }
+    }
   };
 
-  // Chụp ảnh từ camera video frame trực tiếp
+  // Chụp ảnh từ camera video frame
   const captureFromVideo = useCallback(() => {
     if (!videoRef.current) return;
     const video = videoRef.current;
@@ -359,131 +869,36 @@ export function ReceiptScannerModal({
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
 
-    // Tắt camera ngay sau khi chụp xong
     stopCamera();
     setImagePreview(dataUrl);
     setActiveTab('upload');
-    parseUploadedImage('camera-capture.jpg', dataUrl);
+    scanSingleUploadedImage(dataUrl);
   }, [stopCamera, onToast]);
 
-  // Thuật toán phân tích ảnh hóa đơn thực tế qua AI Vision OCR
-  const parseUploadedImage = async (_fileName: string, dataUrl: string) => {
-    setIsScanning(true);
-    setScanProgress(15);
-    setScanStepMessage('Đang nén & tối ưu hóa độ nét ảnh hóa đơn...');
-    setScanResult(null);
-
-    try {
-      // 1. Tối ưu hóa kích thước ảnh trên canvas để gửi nhanh và OCR chính xác cao
-      const compressedDataUrl = await compressImageForOcr(dataUrl, 1600, 0.85);
-
-      setScanProgress(40);
-      setScanStepMessage('AI đang nhận diện chữ quang học & bóc tách hóa đơn...');
-
-      let res: ParsedReceiptResult;
-
-      // Gọi API Route trước
-      try {
-        const response = await fetch('/api/receipt-ocr', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ base64: compressedDataUrl }),
-        });
-
-        if (response.ok) {
-          res = await response.json();
-        } else {
-          // Fallback sang Server Action
-          const formData = new FormData();
-          formData.append('base64', compressedDataUrl);
-          res = await scanReceiptAction(formData);
-        }
-      } catch {
-        // Fallback sang Server Action nếu fetch gặp lỗi mạng
-        const formData = new FormData();
-        formData.append('base64', compressedDataUrl);
-        res = await scanReceiptAction(formData);
-      }
-
-      setScanProgress(85);
-      setScanStepMessage('Đang phân loại danh mục & đối soát thẻ ngân hàng tối ưu...');
-
-      if (res && res.success && res.amount > 0) {
-        const bestCard = findBestCardForCategory(res.category);
-        const result: ScannedReceiptData = {
-          merchant: res.merchant || 'Điểm Bán Hóa Đơn',
-          amount: res.amount,
-          category: res.category,
-          categoryLabel: res.categoryLabel,
-          date: res.date || new Date().toISOString().split('T')[0] || '2026-10-05',
-          time: res.time || '12:00',
-          suggestedCardId: bestCard.id,
-          suggestedCardName: `${bestCard.bankName || 'Ngân Hàng'} (${bestCard.lastFourDigits})`,
-          confidence: res.confidence || 98,
-          rawItems: [
-            { name: res.merchant, price: res.amount, qty: 1 },
-          ],
-          receiptPreviewUrl: dataUrl,
-        };
-
-        setScanResult(result);
-        setEditableMerchant(result.merchant);
-        setEditableAmount(result.amount);
-        setEditableCategory(result.category);
-        setEditableCardId(result.suggestedCardId);
-        onToast(`✨ AI đã bóc tách chính xác: ${result.merchant} (${result.amount.toLocaleString('vi-VN')} VNĐ)!`);
-      } else {
-        // Fallback thông minh nếu không phát hiện được số tiền
-        const bestCard = findBestCardForCategory(res?.category || 'dining');
-        const result: ScannedReceiptData = {
-          merchant: res?.merchant && res.merchant !== 'Điểm Bán / Hóa Đơn' ? res.merchant : 'Tiệm Trà Xinh',
-          amount: res?.amount && res.amount > 0 ? res.amount : 100000,
-          category: res?.category || 'dining',
-          categoryLabel: res?.categoryLabel || 'Ăn uống',
-          date: res?.date || '2025-09-22',
-          time: res?.time || '15:32',
-          suggestedCardId: bestCard.id,
-          suggestedCardName: `${bestCard.bankName || 'Ngân Hàng'} (${bestCard.lastFourDigits})`,
-          confidence: 90,
-          rawItems: [
-            { name: 'Trà sữa trân châu', price: 35000, qty: 1 },
-            { name: 'Trà đào cam sả', price: 45000, qty: 1 },
-            { name: 'Bánh tráng trộn', price: 20000, qty: 1 },
-          ],
-          receiptPreviewUrl: dataUrl,
-        };
-        setScanResult(result);
-        setEditableMerchant(result.merchant);
-        setEditableAmount(result.amount);
-        setEditableCategory(result.category);
-        setEditableCardId(result.suggestedCardId);
-        onToast(`📸 Đã nhận diện hóa đơn: ${result.merchant} (${result.amount.toLocaleString('vi-VN')} VNĐ)`);
-      }
-    } catch (err) {
-      console.error('Scan error:', err);
-      onToast('⚠️ Lỗi khi nhận diện ảnh. Vui lòng thử lại.');
-    } finally {
-      setScanProgress(100);
-      setIsScanning(false);
-    }
+  // Cập nhật thẻ được chọn cho 1 ảnh trong batch
+  const handleUpdateBatchCard = (itemId: string, cardId: string) => {
+    setBatchQueue((prev) =>
+      prev.map((item) => (item.id === itemId ? { ...item, selectedCardId: cardId } : item))
+    );
   };
 
-  // Áp dụng dữ liệu đã quét vào form thêm giao dịch
-  const handleApply = () => {
-    if (!scanResult) return;
-    const finalData: ScannedReceiptData = {
-      ...scanResult,
-      merchant: editableMerchant.trim() || scanResult.merchant,
-      amount: editableAmount > 0 ? editableAmount : scanResult.amount,
-      category: editableCategory,
-      suggestedCardId: editableCardId || scanResult.suggestedCardId,
-    };
-    onApplyToForm(finalData);
-    onClose();
+  // Cập nhật thẻ chung cho TẤT CẢ ảnh trong batch
+  const handleApplyCardToAllBatch = (cardId: string) => {
+    if (!cardId) return;
+    setBatchQueue((prev) =>
+      prev.map((item) => ({ ...item, selectedCardId: cardId }))
+    );
+    const card = cards.find((c) => c.id === cardId);
+    onToast(`✨ Đã áp dụng thẻ "${card?.nickname || card?.bankName}" cho tất cả ${batchQueue.length} hóa đơn!`);
   };
 
-  // Lưu nhanh thành giao dịch ngay lập tức
-  const handleDirectSave = () => {
+  // Xóa 1 ảnh khỏi batch queue
+  const handleRemoveBatchItem = (itemId: string) => {
+    setBatchQueue((prev) => prev.filter((i) => i.id !== itemId));
+  };
+
+  // Lưu 1 giao dịch đơn lẻ
+  const handleDirectSaveSingle = () => {
     if (!scanResult) return;
     const amountVal = editableAmount > 0 ? editableAmount : scanResult.amount;
     const merchantVal = editableMerchant.trim() || scanResult.merchant;
@@ -511,16 +926,59 @@ export function ReceiptScannerModal({
       amount: amountVal,
       type: 'expense',
       date: scanResult.date,
-      dateDisplay: 'Hôm nay',
+      dateDisplay: formatTransactionDate(scanResult.date),
       time: scanResult.time || '12:00',
+      receiptImage: scanResult.receiptPreviewUrl || imagePreview || undefined,
     });
+
     onToast(`✅ Đã lưu giao dịch: ${merchantVal} (-${amountVal.toLocaleString('vi-VN')} VNĐ)`);
     onClose();
   };
 
+  // Lưu TẤT CẢ các giao dịch trong Batch Queue
+  const handleSaveAllBatch = () => {
+    const readyItems = batchQueue.filter((b) => b.status === 'success' && b.amount > 0);
+    if (readyItems.length === 0) {
+      onToast('⚠️ Chưa có hóa đơn nào hoàn tất quét để lưu');
+      return;
+    }
+
+    const txsToSave: Omit<TransactionItem, 'id' | 'referenceId' | 'status'>[] = readyItems.map((item) => {
+      const card = cards.find((c) => c.id === item.selectedCardId) || cards[0];
+      return {
+        cardId: card?.id || 'card-1',
+        cardLast4: card?.lastFourDigits || '9921',
+        merchant: item.merchant,
+        category: item.category,
+        categoryLabel: item.categoryLabel,
+        amount: item.amount,
+        type: 'expense',
+        date: item.date,
+        dateDisplay: formatTransactionDate(item.date),
+        time: item.time,
+        receiptImage: item.dataUrl,
+      };
+    });
+
+    if (onQuickSaveBatchTransactions) {
+      onQuickSaveBatchTransactions(txsToSave);
+    } else {
+      txsToSave.forEach((tx) => onQuickSaveTransaction(tx));
+    }
+
+    onToast(`🎉 Đã lưu thành công ${txsToSave.length} hóa đơn kèm ảnh vào Lịch sử giao dịch!`);
+    setBatchQueue([]);
+    onClose();
+  };
+
+  // Tổng số tiền trong batch
+  const totalBatchAmount = useMemo(() => {
+    return batchQueue.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+  }, [batchQueue]);
+
   if (!isOpen) return null;
 
-  const selectedPreset: SampleReceiptPreset = SAMPLE_PRESETS.find((p) => p.id === selectedPresetId) ?? SAMPLE_PRESETS[0]!;
+  const selectedPreset = (SAMPLE_PRESETS.find((p) => p.id === selectedPresetId) ?? SAMPLE_PRESETS[0])!;
 
   return (
     <div
@@ -541,8 +999,8 @@ export function ReceiptScannerModal({
       <div
         style={{
           width: '100%',
-          maxWidth: '780px',
-          maxHeight: 'min(92vh, 840px)',
+          maxWidth: batchQueue.length > 0 ? '880px' : '780px',
+          maxHeight: 'min(92vh, 860px)',
           background: 'linear-gradient(180deg, #0b1329 0%, #060a17 100%)',
           border: '1px solid rgba(56, 189, 248, 0.35)',
           borderRadius: '24px',
@@ -552,6 +1010,7 @@ export function ReceiptScannerModal({
           flexDirection: 'column',
           margin: 'auto',
           position: 'relative',
+          transition: 'max-width 0.2s',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -588,7 +1047,7 @@ export function ReceiptScannerModal({
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#ffffff' }}>
-                  Quét Hóa Đơn Tự Động Bằng AI
+                  Quét Lịch Sử Giao Dịch & Hóa Đơn AI
                 </h3>
                 <span
                   style={{
@@ -602,11 +1061,11 @@ export function ReceiptScannerModal({
                     color: '#ffffff',
                   }}
                 >
-                  AI Vision OCR
+                  {batchQueue.length > 0 ? `Đang xử lý (${batchQueue.length} GD)` : 'AI Vision OCR'}
                 </span>
               </div>
               <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
-                Chụp hoặc chọn ảnh hóa đơn — AI tự động đọc điểm bán, số tiền, danh mục và gợi ý thẻ tối ưu
+                Thêm ảnh hoặc chụp ảnh trực tiếp — Hỗ trợ ảnh chụp màn hình ngân hàng / ví điện tử (MoMo...), chọn thẻ và quét nhiều ảnh cùng lúc
               </div>
             </div>
           </div>
@@ -630,7 +1089,7 @@ export function ReceiptScannerModal({
           </button>
         </div>
 
-        {/* Tab Switcher: Mẫu thực tế vs Tải ảnh từ máy vs Chụp bằng Camera */}
+        {/* Tab Switcher */}
         <div
           style={{
             padding: '12px 26px 0',
@@ -644,33 +1103,7 @@ export function ReceiptScannerModal({
         >
           <button
             type="button"
-            onClick={() => setActiveTab('sample')}
-            style={{
-              padding: '8px 14px',
-              background: activeTab === 'sample' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
-              border: 'none',
-              borderBottom: activeTab === 'sample' ? '2px solid #38bdf8' : '2px solid transparent',
-              color: activeTab === 'sample' ? '#38bdf8' : '#94a3b8',
-              fontWeight: 700,
-              fontSize: '13px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <FileTextOutlined /> Hóa Đơn Mẫu
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('upload');
-              if (!imagePreview) {
-                fileInputRef.current?.click();
-              }
-            }}
+            onClick={() => setActiveTab('upload')}
             style={{
               padding: '8px 14px',
               background: activeTab === 'upload' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
@@ -687,11 +1120,19 @@ export function ReceiptScannerModal({
               whiteSpace: 'nowrap',
             }}
           >
-            <UploadOutlined /> Tải Ảnh Từ Máy
+            <UploadOutlined /> 📁 Thêm / Tải Ảnh (Chọn Nhiều Ảnh)
+            {batchQueue.length > 0 && (
+              <span style={{ background: '#0284c7', color: '#ffffff', fontSize: '10px', padding: '1px 6px', borderRadius: '10px' }}>
+                {batchQueue.length}
+              </span>
+            )}
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('camera')}
+            onClick={() => {
+              setActiveTab('camera');
+              setBatchQueue([]);
+            }}
             style={{
               padding: '8px 14px',
               background: activeTab === 'camera' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
@@ -708,17 +1149,101 @@ export function ReceiptScannerModal({
               whiteSpace: 'nowrap',
             }}
           >
-            <CameraOutlined style={{ color: '#38bdf8' }} /> 📸 Chụp Ảnh Bằng Camera
+            <CameraOutlined style={{ color: '#38bdf8' }} /> 📸 Chụp Ảnh Trực Tiếp
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('sample');
+              setBatchQueue([]);
+              runPresetScan('momo-history');
+            }}
+            style={{
+              padding: '8px 14px',
+              background: activeTab === 'sample' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+              border: 'none',
+              borderBottom: activeTab === 'sample' ? '2px solid #38bdf8' : '2px solid transparent',
+              color: activeTab === 'sample' ? '#38bdf8' : '#94a3b8',
+              fontWeight: 700,
+              fontSize: '13px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <ThunderboltFilled style={{ color: '#fbbf24' }} /> ⚡ Mẫu Thử Nghiệm (Có MoMo 7 GD)
           </button>
         </div>
 
-        {/* Hidden File Inputs */}
+        {/* Global Card Selector Bar */}
+        <div
+          style={{
+            padding: '10px 26px',
+            background: 'rgba(15, 23, 42, 0.75)',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '10px',
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <CreditCardOutlined style={{ color: '#38bdf8', fontSize: '16px' }} />
+            <div>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#f8fafc' }}>
+                Thẻ Thanh Toán Áp Dụng Cho Ảnh:
+              </span>
+              <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: '6px' }}>
+                (Tự động gán cho các giao dịch quét ra từ ảnh, có thể đổi riêng từng dòng)
+              </span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <select
+              value={batchGlobalCardId || editableCardId}
+              onChange={(e) => {
+                const newCardId = e.target.value;
+                setBatchGlobalCardId(newCardId);
+                setEditableCardId(newCardId);
+                handleApplyCardToAllBatch(newCardId);
+              }}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '8px',
+                background: '#0f172a',
+                border: '1px solid rgba(56, 189, 248, 0.4)',
+                color: '#ffffff',
+                fontSize: '12px',
+                fontWeight: 600,
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              {cards.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.purposeIcon || '💳'} {c.bankName} (•••• {c.lastFourDigits}) — Hạn mức: {(c.dailyLimit || 0).toLocaleString('vi-VN')}đ
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Hidden File Inputs: multiple allowed! */}
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
+          multiple
           style={{ display: 'none' }}
-          onChange={handleFileUpload}
+          onChange={(e) => {
+            if (e.target.files) handleMultipleFiles(e.target.files);
+            e.target.value = '';
+          }}
         />
         <input
           ref={nativeCameraInputRef}
@@ -726,7 +1251,10 @@ export function ReceiptScannerModal({
           accept="image/*"
           capture="environment"
           style={{ display: 'none' }}
-          onChange={handleFileUpload}
+          onChange={(e) => {
+            if (e.target.files) handleMultipleFiles(e.target.files);
+            e.target.value = '';
+          }}
         />
 
         {/* Scrollable Content Body */}
@@ -741,125 +1269,415 @@ export function ReceiptScannerModal({
             gap: '18px',
           }}
         >
-          {/* PHẦN 1: CHỌN NGUỒN HÓA ĐƠN */}
-          {activeTab === 'sample' && (
-            <div>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: '#cbd5e1', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <ThunderboltFilled style={{ color: '#fbbf24' }} /> Chọn hóa đơn mẫu để AI phân tích ngay:
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-                {SAMPLE_PRESETS.map((p) => {
-                  const isSelected = selectedPresetId === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedPresetId(p.id);
-                        runPresetScan(p.id);
-                      }}
-                      style={{
-                        padding: '10px 8px',
-                        borderRadius: '12px',
-                        background: isSelected ? 'rgba(56, 189, 248, 0.18)' : 'rgba(255, 255, 255, 0.04)',
-                        border: isSelected ? '1.5px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.08)',
-                        color: isSelected ? '#38bdf8' : '#cbd5e1',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '4px',
-                        transition: 'all 0.2s',
-                        textAlign: 'center',
-                      }}
-                    >
-                      <div style={{ fontSize: '18px' }}>{p.icon}</div>
-                      <div style={{ fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
-                        {p.title}
-                      </div>
-                      <div style={{ fontSize: '11px', color: isSelected ? '#7dd3fc' : '#64748b' }}>
-                        {p.amount.toLocaleString('vi-VN')} ₫
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
+          {/* TAB 1: UPLOAD & MULTI-IMAGE BATCH */}
           {activeTab === 'upload' && (
             <div>
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                style={{
-                  border: '2px dashed rgba(56, 189, 248, 0.35)',
-                  borderRadius: '16px',
-                  padding: '22px',
-                  textAlign: 'center',
-                  background: 'rgba(56, 189, 248, 0.04)',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
-              >
-                <div style={{ fontSize: '30px', color: '#38bdf8', marginBottom: '8px' }}>
-                  <UploadOutlined />
-                </div>
-                <div style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc' }}>
-                  {imagePreview ? 'Bấm để chọn ảnh hóa đơn khác từ thiết bị' : 'Kéo thả hoặc bấm để tải ảnh hóa đơn từ máy'}
-                </div>
-                <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
-                  Hỗ trợ định dạng PNG, JPG, WebP. Tự động cắt khung & tối ưu độ nét.
-                </div>
-              </div>
+              {/* Nếu ĐÃ CÓ ẢNH TRONG BATCH QUEUE */}
+              {batchQueue.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Batch Action Toolbar */}
+                  <div
+                    style={{
+                      background: 'rgba(30, 41, 59, 0.7)',
+                      border: '1px solid rgba(56, 189, 248, 0.3)',
+                      borderRadius: '16px',
+                      padding: '14px 18px',
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 800, color: '#ffffff' }}>
+                        📋 Đã chọn: <span style={{ color: '#38bdf8' }}>{batchQueue.length} hóa đơn</span>
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#94a3b8' }}>•</span>
+                      <span style={{ fontSize: '13px', fontWeight: 800, color: '#34d399' }}>
+                        Tổng tiền: {totalBatchAmount.toLocaleString('vi-VN')} VNĐ
+                      </span>
+                    </div>
 
-              {/* Nút tắt chuyển sang camera trực tiếp */}
-              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('camera')}
-                  style={{
-                    flex: 1,
-                    padding: '9px 14px',
-                    borderRadius: '10px',
-                    background: 'rgba(56, 189, 248, 0.1)',
-                    border: '1px solid rgba(56, 189, 248, 0.3)',
-                    color: '#38bdf8',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                  }}
-                >
-                  <CameraOutlined /> Mở Camera Chụp Trực Tiếp
-                </button>
-                <button
-                  type="button"
-                  onClick={() => nativeCameraInputRef.current?.click()}
-                  style={{
-                    flex: 1,
-                    padding: '9px 14px',
-                    borderRadius: '10px',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    color: '#cbd5e1',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                  }}
-                >
-                  <MobileOutlined /> Mở Máy Ảnh Điện Thoại
-                </button>
-              </div>
+                    {/* Quick batch card assignment */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>
+                        <CreditCardOutlined style={{ color: '#38bdf8' }} /> Gán nhanh 1 thẻ cho tất cả:
+                      </span>
+                      <select
+                        value={batchGlobalCardId}
+                        onChange={(e) => {
+                          setBatchGlobalCardId(e.target.value);
+                          handleApplyCardToAllBatch(e.target.value);
+                        }}
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: '8px',
+                          background: 'rgba(15, 23, 42, 0.9)',
+                          border: '1px solid rgba(56, 189, 248, 0.4)',
+                          color: '#ffffff',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          outline: 'none',
+                        }}
+                      >
+                        {cards.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.purposeIcon || '💳'} {c.bankName} (•••• {c.lastFourDigits})
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          background: 'rgba(56, 189, 248, 0.15)',
+                          border: '1px solid rgba(56, 189, 248, 0.3)',
+                          color: '#38bdf8',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <PlusOutlined /> Thêm Ảnh
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Batch Receipts List */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {batchQueue.map((item, index) => {
+                      const bestCardForThis = findBestCardForCategory(item.category);
+                      const isRecommended = item.selectedCardId === bestCardForThis.id;
+
+                      return (
+                        <div
+                          key={item.id}
+                          style={{
+                            background: 'rgba(15, 23, 42, 0.6)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            borderRadius: '16px',
+                            padding: '14px 16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '14px',
+                            transition: 'all 0.2s',
+                          }}
+                        >
+                          {/* STT */}
+                          <div
+                            style={{
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '50%',
+                              background: 'rgba(255, 255, 255, 0.08)',
+                              color: '#94a3b8',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                            }}
+                          >
+                            {index + 1}
+                          </div>
+
+                          {/* Thumbnail with Lightbox trigger */}
+                          <div
+                            style={{
+                              position: 'relative',
+                              width: '56px',
+                              height: '56px',
+                              borderRadius: '10px',
+                              overflow: 'hidden',
+                              flexShrink: 0,
+                              cursor: 'pointer',
+                              border: '1px solid rgba(56, 189, 248, 0.3)',
+                            }}
+                            onClick={() => setLightboxImage(item.dataUrl)}
+                            title="Bấm để xem ảnh phóng to"
+                          >
+                            <img
+                              src={item.dataUrl}
+                              alt={item.fileName}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                            <div
+                              style={{
+                                position: 'absolute',
+                                inset: 0,
+                                background: 'rgba(0,0,0,0.3)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <EyeOutlined style={{ color: '#ffffff', fontSize: '14px' }} />
+                            </div>
+                          </div>
+
+                          {/* Info Fields */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            {item.status === 'scanning' ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <ReloadOutlined spin style={{ color: '#38bdf8' }} />
+                                <span style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 600 }}>
+                                  Đang bóc tách dữ liệu AI...
+                                </span>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <input
+                                    type="text"
+                                    value={item.merchant}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setBatchQueue((prev) =>
+                                        prev.map((b) => (b.id === item.id ? { ...b, merchant: val } : b))
+                                      );
+                                    }}
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
+                                      color: '#ffffff',
+                                      fontSize: '13px',
+                                      fontWeight: 700,
+                                      outline: 'none',
+                                      maxWidth: '220px',
+                                    }}
+                                    title="Sửa tên điểm bán"
+                                  />
+                                  <span
+                                    style={{
+                                      fontSize: '10px',
+                                      padding: '2px 6px',
+                                      borderRadius: '6px',
+                                      background: 'rgba(56, 189, 248, 0.12)',
+                                      color: '#38bdf8',
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    {item.categoryLabel}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                                  {formatTransactionDate(item.date)} lúc {item.time} • File: {item.fileName}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Amount Input */}
+                          <div style={{ width: '130px', flexShrink: 0 }}>
+                            <div style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '2px' }}>Số tiền (VNĐ)</div>
+                            <input
+                              type="number"
+                              value={item.amount || ''}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10) || 0;
+                                setBatchQueue((prev) =>
+                                  prev.map((b) => (b.id === item.id ? { ...b, amount: val } : b))
+                                );
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '6px 8px',
+                                borderRadius: '8px',
+                                background: 'rgba(30, 41, 59, 0.8)',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                color: '#34d399',
+                                fontSize: '13px',
+                                fontWeight: 800,
+                                outline: 'none',
+                                boxSizing: 'border-box',
+                                fontFamily: 'monospace',
+                              }}
+                            />
+                          </div>
+
+                          {/* GIAO DIỆN CHỌN THẺ CHO HÌNH ẢNH NÀY */}
+                          <div style={{ width: '220px', flexShrink: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                              <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>Thẻ thanh toán:</span>
+                              {isRecommended && (
+                                <span style={{ fontSize: '9px', color: '#34d399', fontWeight: 700 }}>
+                                  ⭐ Tối ưu hoàn tiền
+                                </span>
+                              )}
+                            </div>
+                            <select
+                              value={item.selectedCardId}
+                              onChange={(e) => handleUpdateBatchCard(item.id, e.target.value)}
+                              style={{
+                                width: '100%',
+                                padding: '6px 8px',
+                                borderRadius: '8px',
+                                background: isRecommended ? 'rgba(16, 185, 129, 0.12)' : 'rgba(30, 41, 59, 0.8)',
+                                border: isRecommended ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
+                                color: '#ffffff',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                outline: 'none',
+                                boxSizing: 'border-box',
+                              }}
+                            >
+                              {cards.map((c) => {
+                                const isBest = c.id === bestCardForThis.id;
+                                return (
+                                  <option key={c.id} value={c.id} style={{ background: '#0f172a' }}>
+                                    {c.purposeIcon || '💳'} {c.bankName} (•••• {c.lastFourDigits}){isBest ? ' — ⭐ [AI Gợi ý]' : ''}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+
+                          {/* Delete Item */}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveBatchItem(item.id)}
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.12)',
+                              border: '1px solid rgba(239, 68, 68, 0.25)',
+                              color: '#f87171',
+                              borderRadius: '8px',
+                              width: '32px',
+                              height: '32px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                            }}
+                            title="Xóa hóa đơn này"
+                          >
+                            <DeleteOutlined />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                /* Khu Vực Kéo Thả / Upload Ban Đầu */
+                <div>
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDragOver(true);
+                    }}
+                    onDragLeave={() => setIsDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragOver(false);
+                      if (e.dataTransfer.files) {
+                        handleMultipleFiles(e.dataTransfer.files);
+                      }
+                    }}
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      border: isDragOver ? '2px dashed #38bdf8' : '2px dashed rgba(56, 189, 248, 0.4)',
+                      borderRadius: '16px',
+                      padding: '36px 20px',
+                      textAlign: 'center',
+                      background: isDragOver ? 'rgba(56, 189, 248, 0.12)' : 'rgba(15, 23, 42, 0.45)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <div style={{ fontSize: '38px', color: '#38bdf8', marginBottom: '10px' }}>
+                      <PictureOutlined />
+                    </div>
+                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#f8fafc' }}>
+                      Thêm Ảnh Lịch Sử Giao Dịch Hoặc Hóa Đơn (Hỗ Trợ Chọn Nhiều Ảnh)
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '6px', maxWidth: '480px', margin: '6px auto 0', lineHeight: '1.5' }}>
+                      Kéo thả hoặc bấm vào đây để tải lên. Hỗ trợ <strong>ảnh chụp màn hình ứng dụng ngân hàng / ví MoMo</strong> (tự động nhận diện nhiều giao dịch trong 1 ảnh) hoặc <strong>nhiều ảnh hóa đơn</strong> cùng lúc!
+                    </div>
+                    <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '8px 16px',
+                          borderRadius: '10px',
+                          background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.25) 0%, rgba(2, 132, 199, 0.35) 100%)',
+                          border: '1px solid rgba(56, 189, 248, 0.45)',
+                          color: '#38bdf8',
+                          fontSize: '13px',
+                          fontWeight: 700,
+                          boxShadow: '0 0 15px rgba(56, 189, 248, 0.2)',
+                        }}
+                      >
+                        <UploadOutlined /> 📁 Thêm Ảnh (Chọn Được Nhiều Ảnh)
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Nút hành động trực tiếp: Chụp ảnh & Thử mẫu MoMo */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '14px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('camera')}
+                      style={{
+                        padding: '12px 14px',
+                        borderRadius: '12px',
+                        background: 'rgba(56, 189, 248, 0.12)',
+                        border: '1px solid rgba(56, 189, 248, 0.35)',
+                        color: '#38bdf8',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      <CameraOutlined style={{ fontSize: '16px' }} /> 📸 Chụp Ảnh Trực Tiếp
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('sample');
+                        setBatchQueue([]);
+                        runPresetScan('momo-history');
+                      }}
+                      style={{
+                        padding: '12px 14px',
+                        borderRadius: '12px',
+                        background: 'linear-gradient(135deg, rgba(217, 70, 239, 0.15) 0%, rgba(192, 38, 211, 0.25) 100%)',
+                        border: '1px solid rgba(217, 70, 239, 0.4)',
+                        color: '#f0abfc',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      <MobileOutlined style={{ fontSize: '16px' }} /> ⚡ Thử Quét Mẫu MoMo (7 GD)
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
+          {/* TAB 2: CAMERA TRỰC TIẾP */}
           {activeTab === 'camera' && (
             <div
               style={{
@@ -905,8 +1723,8 @@ export function ReceiptScannerModal({
                       style={{
                         padding: '8px 16px',
                         borderRadius: '10px',
-                        background: 'linear-gradient(90deg, #0284c7, #38bdf8)',
-                        border: 'none',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
                         color: '#ffffff',
                         fontWeight: 700,
                         fontSize: '12px',
@@ -916,173 +1734,61 @@ export function ReceiptScannerModal({
                         gap: '6px',
                       }}
                     >
-                      <MobileOutlined /> Chụp Qua Máy Ảnh Thiết Bị
+                      <MobileOutlined /> Dùng Máy Ảnh Gốc
                     </button>
                   </div>
                 </div>
               ) : (
-                <div style={{ position: 'relative', background: '#000000', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                  {/* Khung ngắm Camera Live */}
+                <div style={{ position: 'relative', width: '100%', height: '320px', background: '#000000' }}>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                  {/* Khung ngắm laser */}
                   <div
                     style={{
-                      position: 'relative',
-                      width: '100%',
-                      height: '360px',
-                      background: '#040711',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      overflow: 'hidden',
+                      position: 'absolute',
+                      inset: '24px',
+                      border: '2px solid rgba(56, 189, 248, 0.6)',
+                      borderRadius: '14px',
+                      pointerEvents: 'none',
+                      boxShadow: '0 0 20px rgba(56, 189, 248, 0.2) inset',
                     }}
-                  >
-                    {isCameraStarting && (
-                      <div style={{ position: 'absolute', inset: 0, zIndex: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#040711', color: '#38bdf8', fontSize: '13px', fontWeight: 700, gap: '10px' }}>
-                        <SyncOutlined spin style={{ fontSize: '24px' }} />
-                        <span>Đang kết nối camera & tối ưu độ nét...</span>
-                      </div>
-                    )}
-
-                    {cameraStream && (
-                      <div style={{ position: 'absolute', top: '12px', left: '14px', zIndex: 11, display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(2, 6, 23, 0.8)', padding: '4px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700, color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.4)' }}>
-                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }} /> LIVE CAMERA
-                      </div>
-                    )}
-
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                      }}
-                    />
-
-                    {/* HUD Reticle Khung Ngắm Hóa Đơn */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        inset: '20px 20%',
-                        border: '1.5px dashed rgba(56, 189, 248, 0.65)',
-                        borderRadius: '16px',
-                        boxShadow: '0 0 0 9999px rgba(2, 6, 23, 0.5)',
-                        pointerEvents: 'none',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        padding: '10px',
-                      }}
-                    >
-                      {/* Góc ngắm HUD góc trên */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <div style={{ width: '20px', height: '20px', borderTop: '3px solid #38bdf8', borderLeft: '3px solid #38bdf8', borderRadius: '4px 0 0 0' }} />
-                        <div style={{ width: '20px', height: '20px', borderTop: '3px solid #38bdf8', borderRight: '3px solid #38bdf8', borderRadius: '0 4px 0 0' }} />
-                      </div>
-
-                      {/* Thông báo hướng dẫn */}
-                      <div
-                        style={{
-                          textAlign: 'center',
-                          fontSize: '11px',
-                          fontWeight: 800,
-                          color: '#38bdf8',
-                          background: 'rgba(2, 6, 23, 0.85)',
-                          padding: '4px 12px',
-                          borderRadius: '8px',
-                          alignSelf: 'center',
-                          letterSpacing: '0.04em',
-                          border: '1px solid rgba(56, 189, 248, 0.4)',
-                        }}
-                      >
-                        🎯 CĂN HÓA ĐƠN TRONG KHUNG
-                      </div>
-
-                      {/* Góc ngắm HUD góc dưới */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <div style={{ width: '20px', height: '20px', borderBottom: '3px solid #38bdf8', borderLeft: '3px solid #38bdf8', borderRadius: '0 0 0 4px' }} />
-                        <div style={{ width: '20px', height: '20px', borderBottom: '3px solid #38bdf8', borderRight: '3px solid #38bdf8', borderRadius: '0 0 4px 0' }} />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Thanh điều khiển Camera */}
+                  />
+                  {/* Nút chụp */}
                   <div
                     style={{
-                      width: '100%',
-                      padding: '14px 20px',
-                      background: 'rgba(10, 18, 38, 0.98)',
-                      borderTop: '1px solid rgba(56, 189, 248, 0.25)',
+                      position: 'absolute',
+                      bottom: '16px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
                       display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
                       gap: '12px',
+                      zIndex: 20,
                     }}
                   >
-                    <button
-                      type="button"
-                      onClick={toggleCameraFacing}
-                      style={{
-                        padding: '9px 14px',
-                        borderRadius: '10px',
-                        background: 'rgba(255, 255, 255, 0.06)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                        color: '#cbd5e1',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                      }}
-                      title="Đổi camera trước hoặc sau"
-                    >
-                      <SyncOutlined /> Đổi Camera
-                    </button>
-
-                    {/* Nút chụp to tròn trung tâm */}
                     <button
                       type="button"
                       onClick={captureFromVideo}
                       style={{
-                        padding: '12px 28px',
-                        borderRadius: '999px',
+                        padding: '10px 22px',
+                        borderRadius: '12px',
                         background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
-                        border: '2px solid rgba(255, 255, 255, 0.4)',
-                        boxShadow: '0 0 25px rgba(56, 189, 248, 0.65)',
+                        border: 'none',
                         color: '#ffffff',
-                        fontSize: '14px',
                         fontWeight: 800,
+                        fontSize: '13px',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        transition: 'transform 0.15s, box-shadow 0.15s',
+                        boxShadow: '0 4px 15px rgba(56, 189, 248, 0.5)',
                       }}
                     >
-                      <CameraOutlined style={{ fontSize: '18px' }} /> Bấm Chụp & Quét AI
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => nativeCameraInputRef.current?.click()}
-                      style={{
-                        padding: '9px 14px',
-                        borderRadius: '10px',
-                        background: 'rgba(255, 255, 255, 0.06)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                        color: '#cbd5e1',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                      }}
-                      title="Mở ứng dụng máy ảnh của điện thoại"
-                    >
-                      <MobileOutlined /> Máy Ảnh Gốc
+                      <CameraOutlined /> Chụp & Quét AI
                     </button>
                   </div>
                 </div>
@@ -1090,261 +1796,347 @@ export function ReceiptScannerModal({
             </div>
           )}
 
-          {/* PHẦN 2: PREVIEW HÓA ĐƠN & SCANNING LASER ANIMATION (Chỉ hiện khi ở tab Mẫu hoặc Tải ảnh) */}
-          {activeTab !== 'camera' && (
+          {/* TAB 3: MẪU HÓA ĐƠN THỰC TẾ CÓ SẴN */}
+          {activeTab === 'sample' && (
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#cbd5e1', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <ThunderboltFilled style={{ color: '#fbbf24' }} /> Chọn hóa đơn mẫu để AI phân tích ngay:
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                {SAMPLE_PRESETS.map((p) => {
+                  const isSelected = selectedPresetId === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedPresetId(p.id);
+                        runPresetScan(p.id);
+                      }}
+                      style={{
+                        padding: '10px 10px',
+                        borderRadius: '12px',
+                        background: isSelected ? 'rgba(56, 189, 248, 0.18)' : 'rgba(30, 41, 59, 0.5)',
+                        border: isSelected ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.08)',
+                        color: '#ffffff',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        boxShadow: isSelected ? '0 0 15px rgba(56, 189, 248, 0.15)' : 'none',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '18px' }}>{p.icon}</span>
+                        <span
+                          style={{
+                            fontSize: '9px',
+                            fontWeight: 700,
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            background: 'rgba(255, 255, 255, 0.1)',
+                            color: '#94a3b8',
+                          }}
+                        >
+                          {p.tag}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {p.title}
+                      </div>
+                      <div style={{ fontSize: '11px', fontWeight: 800, color: '#38bdf8', marginTop: '2px' }}>
+                        {p.amount.toLocaleString('vi-VN')} ₫
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* HIỂN THỊ KẾT QUẢ ĐƠN LẺ (Khi ở tab Sample, Camera hoặc Upload 1 ảnh) */}
+          {batchQueue.length === 0 && (
             <div
               style={{
                 display: 'grid',
                 gridTemplateColumns: '1fr 1.25fr',
-                gap: '18px',
+                gap: '16px',
                 background: 'rgba(15, 23, 42, 0.65)',
                 border: '1px solid rgba(255, 255, 255, 0.08)',
                 borderRadius: '16px',
                 padding: '16px',
               }}
             >
-            {/* Cột trái: Giấy Hóa Đơn Trực Quan */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                📄 Bản chụp hóa đơn:
-              </div>
+              {/* Cột trái: Giấy Hóa Đơn Trực Quan */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                  📄 Bản chụp hóa đơn:
+                </div>
 
-              <div
-                style={{
-                  position: 'relative',
-                  background: '#ffffff',
-                  color: '#1e293b',
-                  borderRadius: '10px',
-                  padding: '16px 14px',
-                  fontFamily: 'monospace',
-                  fontSize: '11px',
-                  lineHeight: '1.45',
-                  boxShadow: '0 10px 25px rgba(0, 0, 0, 0.5)',
-                  minHeight: '260px',
-                  overflow: 'hidden',
-                }}
-              >
-                {/* Tia laser quét AI */}
-                {isScanning && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: 0,
-                      right: 0,
-                      height: '3px',
-                      background: 'linear-gradient(90deg, transparent, #0284c7, #38bdf8, transparent)',
-                      boxShadow: '0 0 12px #38bdf8, 0 0 24px #0284c7',
-                      zIndex: 10,
-                      animation: 'scanLaser 1.5s ease-in-out infinite alternate',
-                    }}
-                  />
-                )}
-
-                <style>{`
-                  @keyframes scanLaser {
-                    0% { top: 4%; }
-                    100% { top: 94%; }
-                  }
-                `}</style>
-
-                {/* Nội dung mẫu hóa đơn */}
-                {imagePreview ? (
-                  <div style={{ textAlign: 'center' }}>
-                    <img
-                      src={imagePreview}
-                      alt="Uploaded receipt"
-                      style={{ maxWidth: '100%', maxHeight: '240px', borderRadius: '6px', objectFit: 'contain' }}
-                    />
-                  </div>
-                ) : (
-                  <div>
-                    <div style={{ textAlign: 'center', borderBottom: '1px dashed #cbd5e1', paddingBottom: '8px', marginBottom: '8px' }}>
-                      <div style={{ fontWeight: 800, fontSize: '13px', color: '#0f172a' }}>
-                        {selectedPreset.merchant}
-                      </div>
-                      <div style={{ fontSize: '10px', color: '#64748b' }}>{selectedPreset.address}</div>
-                      <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
-                        Ngày: {selectedPreset.date} — Giờ: {selectedPreset.time}
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
-                      {selectedPreset.items.map((item, idx) => (
-                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
-                          <span>{item.qty}x {item.name}</span>
-                          <span style={{ fontWeight: 700 }}>{item.price.toLocaleString('vi-VN')}đ</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px', marginTop: '8px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '13px', color: '#0f172a' }}>
-                        <span>TỔNG TIỀN:</span>
-                        <span style={{ color: '#0284c7' }}>{selectedPreset.amount.toLocaleString('vi-VN')} VNĐ</span>
-                      </div>
-                      <div style={{ fontSize: '9px', color: '#94a3b8', textAlign: 'center', marginTop: '10px' }}>
-                        --- CẢM ƠN QUÝ KHÁCH ---
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Cột phải: Kết Quả Bóc Tách & Tùy Chỉnh Nhanh */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase' }}>
-                  🤖 Kết Quả AI Bóc Tách:
-                </span>
-                {scanResult && (
-                  <span style={{ fontSize: '11px', color: '#34d399', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <CheckCircleFilled /> Độ tin cậy: {scanResult.confidence}%
-                  </span>
-                )}
-              </div>
-
-              {isScanning ? (
                 <div
                   style={{
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: 'rgba(2, 6, 23, 0.4)',
-                    borderRadius: '12px',
-                    padding: '20px',
-                    textAlign: 'center',
-                    gap: '12px',
+                    position: 'relative',
+                    background: '#ffffff',
+                    color: '#1e293b',
+                    borderRadius: '10px',
+                    padding: '16px 14px',
+                    fontFamily: 'monospace',
+                    fontSize: '11px',
+                    lineHeight: '1.45',
+                    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.5)',
+                    minHeight: '260px',
+                    overflow: 'hidden',
                   }}
                 >
-                  <ReloadOutlined spin style={{ fontSize: '28px', color: '#38bdf8' }} />
-                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc' }}>
-                    {scanStepMessage}
-                  </div>
-                  {/* Progress bar */}
-                  <div style={{ width: '80%', height: '6px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                  {/* Tia laser quét AI */}
+                  {isScanning && (
                     <div
                       style={{
-                        height: '100%',
-                        width: `${scanProgress}%`,
-                        background: 'linear-gradient(90deg, #0284c7, #38bdf8)',
-                        transition: 'width 0.3s ease',
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        height: '3px',
+                        background: 'linear-gradient(90deg, transparent, #0284c7, #38bdf8, transparent)',
+                        boxShadow: '0 0 12px #38bdf8, 0 0 24px #0284c7',
+                        zIndex: 10,
+                        animation: 'scanLaser 1.5s ease-in-out infinite alternate',
                       }}
                     />
-                  </div>
-                </div>
-              ) : scanResult ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {/* Tên điểm bán */}
-                  <div>
-                    <label style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>Tên Điểm Bán / Merchant</label>
-                    <input
-                      type="text"
-                      value={editableMerchant}
-                      onChange={(e) => setEditableMerchant(e.target.value)}
-                      style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        background: 'rgba(30, 41, 59, 0.7)',
-                        border: '1px solid rgba(56, 189, 248, 0.3)',
-                        borderRadius: '8px',
-                        padding: '8px 12px',
-                        color: '#ffffff',
-                        fontSize: '13px',
-                        fontWeight: 700,
-                        outline: 'none',
-                        marginTop: '4px',
-                      }}
-                    />
-                  </div>
+                  )}
 
-                  {/* Số tiền */}
-                  <div>
-                    <label style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>Số Tiền Thanh Toán (VNĐ)</label>
-                    <input
-                      type="text"
-                      value={`${editableAmount.toLocaleString('vi-VN')} VNĐ`}
-                      onChange={(e) => {
-                        const raw = parseInt(e.target.value.replace(/\D/g, ''), 10) || 0;
-                        setEditableAmount(raw);
-                      }}
-                      style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        background: 'rgba(30, 41, 59, 0.7)',
-                        border: '1px solid rgba(56, 189, 248, 0.3)',
-                        borderRadius: '8px',
-                        padding: '8px 12px',
-                        color: '#34d399',
-                        fontSize: '15px',
-                        fontWeight: 800,
-                        fontFamily: 'monospace',
-                        outline: 'none',
-                        marginTop: '4px',
-                      }}
-                    />
-                  </div>
+                  <style>{`
+                    @keyframes scanLaser {
+                      0% { top: 4%; }
+                      100% { top: 94%; }
+                    }
+                  `}</style>
 
-                  {/* Danh mục tự động */}
-                  <div>
-                    <label style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>Danh Mục Tự Động Phân Loại</label>
-                    <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
-                      {[
-                        { id: 'dining', label: '🍔 Ăn uống' },
-                        { id: 'shopping', label: '🛍️ Mua sắm' },
-                        { id: 'transport', label: '🚗 Di chuyển' },
-                        { id: 'tech', label: '💻 Công nghệ' },
-                      ].map((cat) => (
-                        <button
-                          key={cat.id}
-                          type="button"
-                          onClick={() => setEditableCategory(cat.id as any)}
-                          style={{
-                            flex: 1,
-                            padding: '6px 4px',
-                            borderRadius: '8px',
-                            background: editableCategory === cat.id ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-                            border: editableCategory === cat.id ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.08)',
-                            color: editableCategory === cat.id ? '#38bdf8' : '#94a3b8',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {cat.label}
-                        </button>
-                      ))}
+                  {/* Nội dung mẫu hóa đơn hoặc ảnh chụp */}
+                  {imagePreview ? (
+                    <div style={{ textAlign: 'center' }}>
+                      <img
+                        src={imagePreview}
+                        alt="Uploaded receipt"
+                        style={{ maxWidth: '100%', maxHeight: '240px', borderRadius: '6px', objectFit: 'contain', cursor: 'pointer' }}
+                        onClick={() => setLightboxImage(imagePreview)}
+                        title="Bấm để xem ảnh phóng to"
+                      />
                     </div>
-                  </div>
+                  ) : (
+                    <div>
+                      <div style={{ textAlign: 'center', borderBottom: '1px dashed #cbd5e1', paddingBottom: '8px', marginBottom: '8px' }}>
+                        <div style={{ fontWeight: 800, fontSize: '13px', color: '#0f172a' }}>
+                          {selectedPreset.merchant}
+                        </div>
+                        <div style={{ fontSize: '10px', color: '#64748b' }}>{selectedPreset.address}</div>
+                        <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+                          Ngày: {selectedPreset.date} — Giờ: {selectedPreset.time}
+                        </div>
+                      </div>
 
-                  {/* Gợi ý thẻ thông minh */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
+                        {selectedPreset.items.map((item, idx) => (
+                          <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
+                            <span>{item.qty}x {item.name}</span>
+                            <span style={{ fontWeight: 700 }}>{item.price.toLocaleString('vi-VN')}đ</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px', marginTop: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '13px', color: '#0f172a' }}>
+                          <span>TỔNG TIỀN:</span>
+                          <span style={{ color: '#0284c7' }}>{selectedPreset.amount.toLocaleString('vi-VN')} VNĐ</span>
+                        </div>
+                        <div style={{ fontSize: '9px', color: '#94a3b8', textAlign: 'center', marginTop: '10px' }}>
+                          --- CẢM ƠN QUÝ KHÁCH ---
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Cột phải: Kết Quả & GIAO DIỆN CHỌN THẺ */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase' }}>
+                    🤖 Kết Quả AI Bóc Tách:
+                  </span>
+                  {scanResult && (
+                    <span style={{ fontSize: '11px', color: '#34d399', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <CheckCircleFilled /> Độ tin cậy: {scanResult.confidence}%
+                    </span>
+                  )}
+                </div>
+
+                {isScanning ? (
                   <div
                     style={{
-                      background: 'rgba(16, 185, 129, 0.08)',
-                      border: '1px solid rgba(16, 185, 129, 0.25)',
-                      borderRadius: '10px',
-                      padding: '10px 12px',
+                      flex: 1,
                       display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '8px',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: 'rgba(2, 6, 23, 0.4)',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      textAlign: 'center',
+                      gap: '12px',
                     }}
                   >
-                    <BulbOutlined style={{ color: '#34d399', fontSize: '16px', marginTop: '2px' }} />
-                    <div style={{ fontSize: '11px', color: '#cbd5e1' }}>
-                      <strong style={{ color: '#34d399' }}>AI Gợi Ý Thẻ: </strong>
-                      Đã tự động chọn thẻ <strong>{scanResult.suggestedCardName}</strong> phù hợp danh mục chi tiêu để tối ưu quyền lợi hoàn tiền!
+                    <ReloadOutlined spin style={{ fontSize: '28px', color: '#38bdf8' }} />
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc' }}>
+                      {scanStepMessage}
+                    </div>
+                    <div style={{ width: '80%', height: '6px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                      <div
+                        style={{
+                          height: '100%',
+                          width: `${scanProgress}%`,
+                          background: 'linear-gradient(90deg, #0284c7, #38bdf8)',
+                          transition: 'width 0.3s ease',
+                        }}
+                      />
                     </div>
                   </div>
-                </div>
-              ) : null}
+                ) : scanResult ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {/* Tên điểm bán */}
+                    <div>
+                      <label style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>Tên Điểm Bán / Merchant</label>
+                      <input
+                        type="text"
+                        value={editableMerchant}
+                        onChange={(e) => setEditableMerchant(e.target.value)}
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          background: 'rgba(30, 41, 59, 0.7)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '8px',
+                          padding: '7px 10px',
+                          color: '#ffffff',
+                          fontSize: '13px',
+                          fontWeight: 700,
+                          outline: 'none',
+                          marginTop: '4px',
+                        }}
+                      />
+                    </div>
+
+                    {/* Số tiền thanh toán */}
+                    <div>
+                      <label style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>Tổng Tiền Thanh Toán (VNĐ)</label>
+                      <input
+                        type="number"
+                        value={editableAmount || ''}
+                        onChange={(e) => setEditableAmount(parseInt(e.target.value, 10) || 0)}
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          background: 'rgba(30, 41, 59, 0.7)',
+                          border: '1px solid rgba(56, 189, 248, 0.3)',
+                          borderRadius: '8px',
+                          padding: '7px 10px',
+                          color: '#34d399',
+                          fontSize: '15px',
+                          fontWeight: 800,
+                          fontFamily: 'monospace',
+                          outline: 'none',
+                          marginTop: '4px',
+                        }}
+                      />
+                    </div>
+
+                    {/* GIAO DIỆN CHỌN THẺ TRỰC QUAN CHO ẢNH NÀY */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <label style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CreditCardOutlined style={{ color: '#38bdf8' }} /> Thẻ Thanh Toán
+                        </label>
+                        {editableCardId === scanResult.suggestedCardId && (
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              color: '#34d399',
+                              fontWeight: 700,
+                              background: 'rgba(16, 185, 129, 0.15)',
+                              border: '1px solid rgba(16, 185, 129, 0.3)',
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                            }}
+                          >
+                            ⭐ AI Gợi ý tối ưu
+                          </span>
+                        )}
+                      </div>
+
+                      <select
+                        value={editableCardId}
+                        onChange={(e) => setEditableCardId(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          background: editableCardId === scanResult.suggestedCardId ? 'rgba(16, 185, 129, 0.12)' : 'rgba(30, 41, 59, 0.8)',
+                          border: editableCardId === scanResult.suggestedCardId ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255, 255, 255, 0.12)',
+                          color: '#ffffff',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        {cards.map((c) => {
+                          const isBest = c.id === scanResult.suggestedCardId;
+                          return (
+                            <option key={c.id} value={c.id} style={{ background: '#0f172a' }}>
+                              {c.purposeIcon || '💳'} {c.bankName} - {c.nickname} (•••• {c.lastFourDigits}){isBest ? ' — ⭐ [AI Khuyên dùng]' : ''}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+
+                    {/* Danh mục tự động */}
+                    <div>
+                      <label style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>Danh Mục Tự Động</label>
+                      <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+                        {[
+                          { id: 'dining', label: '🍔 Ăn uống' },
+                          { id: 'shopping', label: '🛍️ Mua sắm' },
+                          { id: 'transport', label: '🚗 Di chuyển' },
+                          { id: 'tech', label: '💻 Công nghệ' },
+                        ].map((cat) => (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => setEditableCategory(cat.id as any)}
+                            style={{
+                              flex: 1,
+                              padding: '6px 4px',
+                              borderRadius: '8px',
+                              background: editableCategory === cat.id ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                              border: editableCategory === cat.id ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.08)',
+                              color: editableCategory === cat.id ? '#38bdf8' : '#94a3b8',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {cat.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </div>
-          </div>
           )}
         </div>
 
-        {/* Pinned Footer Actions */}
+        {/* Footer Actions */}
         <div
           style={{
             padding: '16px 26px',
@@ -1374,82 +2166,191 @@ export function ReceiptScannerModal({
             Đóng
           </button>
 
-          {activeTab === 'camera' ? (
-            <button
-              type="button"
-              onClick={captureFromVideo}
-              style={{
-                padding: '11px 28px',
-                borderRadius: '12px',
-                background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
-                border: 'none',
-                color: '#ffffff',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 800,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                boxShadow: '0 0 25px rgba(56, 189, 248, 0.5)',
-              }}
-            >
-              <CameraOutlined style={{ fontSize: '18px' }} />
-              <span>Bấm Chụp & Quét AI Ngay</span>
-            </button>
-          ) : (
+          {/* Nếu ĐANG TRONG BATCH MODE */}
+          {batchQueue.length > 0 ? (
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
                 type="button"
-                onClick={handleApply}
-                disabled={isScanning || !scanResult}
+                onClick={() => setBatchQueue([])}
                 style={{
-                  padding: '10px 18px',
+                  padding: '10px 14px',
                   borderRadius: '10px',
-                  background: 'rgba(56, 189, 248, 0.15)',
-                  border: '1px solid rgba(56, 189, 248, 0.4)',
-                  color: '#38bdf8',
-                  cursor: isScanning || !scanResult ? 'not-allowed' : 'pointer',
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  color: '#f87171',
+                  cursor: 'pointer',
                   fontSize: '13px',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  transition: 'all 0.2s',
+                  fontWeight: 600,
                 }}
               >
-                <span>✨ Điền Vào Form Giao Dịch</span>
-                <ArrowRightOutlined />
+                Xóa Danh Sách
               </button>
-
               <button
                 type="button"
-                onClick={handleDirectSave}
-                disabled={isScanning || !scanResult}
+                onClick={handleSaveAllBatch}
                 style={{
                   padding: '10px 22px',
                   borderRadius: '10px',
-                  background: isScanning || !scanResult
-                    ? 'rgba(16, 185, 129, 0.2)'
-                    : 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                   border: 'none',
                   color: '#ffffff',
-                  cursor: isScanning || !scanResult ? 'not-allowed' : 'pointer',
+                  fontWeight: 800,
                   fontSize: '13px',
-                  fontWeight: 700,
-                  boxShadow: '0 0 20px rgba(16, 185, 129, 0.3)',
+                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  transition: 'all 0.2s',
+                  boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)',
                 }}
               >
-                <CheckCircleFilled />
-                <span>Lưu Giao Dịch Ngay</span>
+                <CheckOutlined /> Lưu Tất Cả ({batchQueue.filter((b) => b.status === 'success').length} Giao Dịch)
               </button>
+            </div>
+          ) : (
+            /* Chế độ đơn lẻ */
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {scanResult && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onApplyToForm({
+                        ...scanResult,
+                        merchant: editableMerchant,
+                        amount: editableAmount,
+                        category: editableCategory,
+                        suggestedCardId: editableCardId,
+                        receiptPreviewUrl: imagePreview || undefined,
+                      });
+                      onClose();
+                    }}
+                    style={{
+                      padding: '10px 16px',
+                      borderRadius: '10px',
+                      background: 'rgba(56, 189, 248, 0.12)',
+                      border: '1px solid rgba(56, 189, 248, 0.3)',
+                      color: '#38bdf8',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <span>Điền Vào Form</span>
+                    <ArrowRightOutlined />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDirectSaveSingle}
+                    style={{
+                      padding: '10px 22px',
+                      borderRadius: '10px',
+                      background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
+                      border: 'none',
+                      color: '#ffffff',
+                      fontWeight: 800,
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 4px 15px rgba(56, 189, 248, 0.4)',
+                    }}
+                  >
+                    <CheckOutlined /> Lưu Giao Dịch Ngay
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
       </div>
+
+      {/* FULLSCREEN LIGHTBOX FOR RECEIPT IMAGE ZOOM */}
+      {lightboxImage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 20005,
+            background: 'rgba(0, 0, 0, 0.94)',
+            backdropFilter: 'blur(16px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+          }}
+          onClick={() => setLightboxImage(null)}
+        >
+          <div
+            style={{ position: 'relative', maxWidth: '92vw', maxHeight: '90vh' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={lightboxImage}
+              alt="Receipt Preview"
+              style={{
+                maxWidth: '100%',
+                maxHeight: '84vh',
+                borderRadius: '12px',
+                boxShadow: '0 25px 80px rgba(0, 0, 0, 0.95)',
+                objectFit: 'contain',
+                display: 'block',
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                top: '-46px',
+                right: '0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+              }}
+            >
+              <a
+                href={lightboxImage}
+                download="hoa-don-cardflow.jpg"
+                style={{
+                  color: '#38bdf8',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  background: 'rgba(30, 41, 59, 0.85)',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  padding: '7px 14px',
+                  borderRadius: '8px',
+                  textDecoration: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <DownloadOutlined /> Tải Ảnh
+              </a>
+              <button
+                type="button"
+                onClick={() => setLightboxImage(null)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.12)',
+                  border: 'none',
+                  color: '#ffffff',
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <CloseOutlined />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

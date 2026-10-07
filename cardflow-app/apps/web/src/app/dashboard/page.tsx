@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { CheckCircleFilled } from '@ant-design/icons';
 import {
   useDashboardState,
@@ -13,6 +14,7 @@ import { TransactionExpenseManager } from '@/app/_components/TransactionExpenseM
 import { AppSettingsHub } from '@/app/_components/AppSettingsHub';
 
 export default function FullscreenDashboard() {
+  const [autoOpenScanner, setAutoOpenScanner] = useState(false);
   const {
     backendStatus,
     isSidebarCollapsed,
@@ -82,6 +84,7 @@ export default function FullscreenDashboard() {
     handleUpdateCard,
     handleAddCard,
     handleAddTransaction,
+    handleAddBatchTransactions,
     handleUpdateTransaction,
     handleDeleteTransaction,
     handleProfileSave,
@@ -183,6 +186,10 @@ export default function FullscreenDashboard() {
               activeCardId={activeCardId}
               onSelectCard={handleSelectCard}
               onOpenAddCard={() => setIsAddCardOpen(true)}
+              onOpenReceiptScanner={() => {
+                setAutoOpenScanner(true);
+                setActiveTab('transactions');
+              }}
               onToggleLock={handleToggleLock}
               onDeleteCard={handleDeleteCard}
               onRequestToggleSensitive={handleRequestToggleSensitive}
@@ -240,6 +247,7 @@ export default function FullscreenDashboard() {
               isBalanceHidden={isBalanceHidden}
               onToggleBalance={handleToggleHideBalance}
               onAddTransaction={handleAddTransaction}
+              onAddBatchTransactions={handleAddBatchTransactions}
               onEditTransaction={handleOpenEditTx}
               onDeleteTransaction={handleOpenDeleteTx}
               onOpenExportReport={() => setIsExportReportOpen(true)}
@@ -247,6 +255,8 @@ export default function FullscreenDashboard() {
               onToast={showToast}
               activeTab={activeTab === 'stats' ? 'stats' : 'transactions'}
               onSelectTransaction={(tx) => setSelectedTxDetail(tx)}
+              autoOpenScanner={autoOpenScanner}
+              onResetAutoOpenScanner={() => setAutoOpenScanner(false)}
             />
           )}
 

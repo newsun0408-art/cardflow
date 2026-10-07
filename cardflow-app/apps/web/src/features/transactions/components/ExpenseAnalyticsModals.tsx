@@ -9,6 +9,7 @@ import {
   BulbOutlined,
 } from '@ant-design/icons';
 import type { CategoryBreakdownItem, TransactionItem } from '../types';
+import { formatTransactionDate } from '../dateUtils';
 import styles from '@/app/_components/TransactionExpenseManager.module.css';
 
 interface ExpenseAnalyticsModalsProps {
@@ -152,7 +153,7 @@ export function ExpenseAnalyticsModals({
                     >
                       <div>
                         <div style={{ color: '#ffffff', fontWeight: 600 }}>{tx.merchant}</div>
-                        <div style={{ color: '#94a3b8', fontSize: '11px' }}>{tx.dateDisplay} • {tx.time}</div>
+                        <div style={{ color: '#94a3b8', fontSize: '11px' }}>{formatTransactionDate(tx.date, tx.dateDisplay)} • {tx.time}</div>
                       </div>
                       <div style={{ color: '#f472b6', fontWeight: 800 }}>
                         {isBalanceHidden ? '•••••• ₫' : `${tx.amount.toLocaleString('vi-VN')} ₫`}

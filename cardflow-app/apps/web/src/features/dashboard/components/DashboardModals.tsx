@@ -9,6 +9,8 @@ import {
   TagOutlined,
   EditOutlined,
   DeleteOutlined,
+  EyeOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons';
 import { AddCardModal } from '@/app/_components/AddCardModal';
 import { ChangePinModal } from '@/app/_components/ChangePinModal';
@@ -21,6 +23,7 @@ import { ImportSheetModal } from '@/app/_components/ImportSheetModal';
 import { UserGuideModal } from '@/app/_components/UserGuideModal';
 import { EditTransactionModal } from '@/features/transactions/components/EditTransactionModal';
 import { DeleteTransactionModal } from '@/features/transactions/components/DeleteTransactionModal';
+import { formatTransactionDate } from '@/features/transactions';
 import type { CardDataModel, TransactionItem } from '../types';
 
 interface DashboardModalsProps {
@@ -121,6 +124,7 @@ export function DashboardModals({
   onOpenDeleteTx,
 }: DashboardModalsProps) {
   const [hasCopiedRef, setHasCopiedRef] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   return (
     <>
@@ -409,7 +413,7 @@ export function DashboardModals({
                   <CalendarOutlined /> Thời gian GD
                 </span>
                 <span style={{ color: '#cbd5e1', fontWeight: 500 }}>
-                  {selectedTxDetail.dateDisplay || selectedTxDetail.date} lúc {selectedTxDetail.time}
+                  {formatTransactionDate(selectedTxDetail.date, selectedTxDetail.dateDisplay)} lúc {selectedTxDetail.time}
                 </span>
               </div>
 
@@ -456,6 +460,113 @@ export function DashboardModals({
                 </div>
               </div>
             </div>
+
+            {/* Receipt Image if available */}
+            {selectedTxDetail.receiptImage && (
+              <div
+                style={{
+                  marginBottom: '16px',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  background: 'rgba(56, 189, 248, 0.05)',
+                  border: '1px solid rgba(56, 189, 248, 0.25)',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '8px',
+                  }}
+                >
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#38bdf8' }}>
+                    🧾 Hóa đơn / Chứng từ scan
+                  </span>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setLightboxImage(selectedTxDetail.receiptImage!)}
+                      style={{
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        background: 'rgba(56, 189, 248, 0.15)',
+                        border: '1px solid rgba(56, 189, 248, 0.4)',
+                        color: '#38bdf8',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      <EyeOutlined /> Phóng to
+                    </button>
+                    <a
+                      href={selectedTxDetail.receiptImage}
+                      download={`receipt-${selectedTxDetail.referenceId}.jpg`}
+                      style={{
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        color: '#e2e8f0',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        textDecoration: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      <DownloadOutlined /> Tải về
+                    </a>
+                  </div>
+                </div>
+                <div
+                  onClick={() => setLightboxImage(selectedTxDetail.receiptImage!)}
+                  style={{
+                    cursor: 'pointer',
+                    position: 'relative',
+                    height: '140px',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    background: '#020617',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                  }}
+                >
+                  <img
+                    src={selectedTxDetail.receiptImage}
+                    alt="Hóa đơn giao dịch"
+                    style={{
+                      maxHeight: '100%',
+                      maxWidth: '100%',
+                      objectFit: 'contain',
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      background: 'rgba(0, 0, 0, 0.35)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#ffffff',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      gap: '4px',
+                    }}
+                  >
+                    <EyeOutlined /> Bấm để phóng to
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Actions */}
             <div style={{ display: 'grid', gridTemplateColumns: (onOpenEditTx || onOpenDeleteTx) ? '1fr 1fr 1fr' : '1fr 1fr', gap: '8px' }}>
@@ -597,6 +708,95 @@ export function DashboardModals({
           transaction={txToDelete || null}
           onConfirmDelete={onConfirmDeleteTx}
         />
+      )}
+
+      {/* Lightbox for Receipt Image */}
+      {lightboxImage && (
+        <div
+          onClick={() => setLightboxImage(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(5, 10, 20, 0.88)',
+            backdropFilter: 'blur(10px)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'relative',
+              maxWidth: '92vw',
+              maxHeight: '90vh',
+              background: '#0f172a',
+              borderRadius: '16px',
+              border: '1px solid rgba(56, 189, 248, 0.35)',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.7)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: '12px', alignItems: 'center' }}>
+              <span style={{ fontSize: '15px', fontWeight: 700, color: '#f8fafc' }}>🧾 Hóa Đơn / Chứng Từ Giao Dịch</span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <a
+                  href={lightboxImage}
+                  download="cardflow-receipt.jpg"
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    background: 'rgba(56, 189, 248, 0.15)',
+                    border: '1px solid rgba(56, 189, 248, 0.4)',
+                    color: '#38bdf8',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <DownloadOutlined /> Tải về máy
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setLightboxImage(null)}
+                  style={{
+                    background: 'rgba(255,255,255,0.1)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: '#fff',
+                    padding: '6px 12px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <CloseOutlined /> Đóng
+                </button>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#020617', borderRadius: '12px', padding: '12px', overflow: 'hidden' }}>
+              <img
+                src={lightboxImage}
+                alt="Ảnh hóa đơn chi tiết"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '75vh',
+                  borderRadius: '8px',
+                  objectFit: 'contain',
+                }}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

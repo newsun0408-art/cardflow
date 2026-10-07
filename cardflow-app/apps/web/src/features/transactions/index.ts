@@ -6,4 +6,5 @@ export * from './components/EditTransactionModal';
 export * from './components/DeleteTransactionModal';
 export * from './components/ExpenseAnalyticsModals';
 export * from './components/ReceiptScannerModal';
+export * from './dateUtils';
 

@@ -10,6 +10,7 @@ import {
 } from '@ant-design/icons';
 import type { CardDataModel } from '@/app/_components/AddCardModal';
 import type { TransactionItem } from '../types';
+import { formatTransactionDate, getLocalDateString } from '../dateUtils';
 import styles from '@/app/_components/TransactionExpenseManager.module.css';
 
 interface EditTransactionModalProps {
@@ -104,6 +105,7 @@ export function EditTransactionModal({
   const [txDate, setTxDate] = useState('');
   const [txTime, setTxTime] = useState('');
   const [txStatus, setTxStatus] = useState<TransactionItem['status']>('Thành công');
+  const [receiptImage, setReceiptImage] = useState<string | null>(null);
 
   // Synchronize state whenever a transaction is selected
   useEffect(() => {
@@ -117,6 +119,7 @@ export function EditTransactionModal({
       setTxDate(transaction.date || new Date().toISOString().slice(0, 10));
       setTxTime(transaction.time || '12:00');
       setTxStatus(transaction.status || 'Thành công');
+      setReceiptImage(transaction.receiptImage || null);
     }
   }, [transaction, cards]);
 
@@ -172,11 +175,7 @@ export function EditTransactionModal({
     const categoryInfo = CATEGORY_MAP[txCategory] || { label: 'Khác' };
 
     // Format date display
-    let displayDate = txDate;
-    const parts = txDate.split('-');
-    if (parts.length === 3) {
-      displayDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
-    }
+    const displayDate = formatTransactionDate(txDate);
 
     const updatedTx: TransactionItem = {
       ...transaction,
@@ -191,6 +190,7 @@ export function EditTransactionModal({
       dateDisplay: displayDate,
       time: txTime || '12:00',
       status: txStatus,
+      receiptImage: receiptImage || undefined,
     };
 
     onSave(updatedTx);
@@ -439,9 +439,47 @@ export function EditTransactionModal({
           {/* 6. Ngày, Giờ & Trạng thái */}
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '8px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <CalendarOutlined style={{ color: '#38bdf8' }} /> Ngày GD
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <CalendarOutlined style={{ color: '#38bdf8' }} /> Ngày GD
+                </label>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setTxDate(getLocalDateString())}
+                    style={{
+                      padding: '1px 5px',
+                      fontSize: '10px',
+                      borderRadius: '4px',
+                      background: 'rgba(56, 189, 248, 0.15)',
+                      border: '1px solid rgba(56, 189, 248, 0.3)',
+                      color: '#38bdf8',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Hôm nay
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() - 1);
+                      setTxDate(getLocalDateString(d));
+                    }}
+                    style={{
+                      padding: '1px 5px',
+                      fontSize: '10px',
+                      borderRadius: '4px',
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      color: '#cbd5e1',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Hôm qua
+                  </button>
+                </div>
+              </div>
               <input
                 type="date"
                 value={txDate}
@@ -459,6 +497,11 @@ export function EditTransactionModal({
                   colorScheme: 'dark',
                 }}
               />
+              {txDate && (
+                <div style={{ fontSize: '10px', color: '#38bdf8', marginTop: '3px', fontWeight: 600 }}>
+                  Hiển thị: {formatTransactionDate(txDate)}
+                </div>
+              )}
             </div>
 
             <div>
@@ -510,6 +553,81 @@ export function EditTransactionModal({
               </select>
             </div>
           </div>
+
+          {/* Ảnh hóa đơn đính kèm (nếu có) */}
+          {receiptImage ? (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                background: 'rgba(56, 189, 248, 0.08)',
+                border: '1px solid rgba(56, 189, 248, 0.25)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <img
+                  src={receiptImage}
+                  alt="Receipt"
+                  style={{ width: '44px', height: '44px', borderRadius: '8px', objectFit: 'cover', border: '1px solid rgba(56, 189, 248, 0.4)' }}
+                />
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#38bdf8' }}>🧾 Ảnh hóa đơn đính kèm</div>
+                  <div style={{ fontSize: '10px', color: '#94a3b8' }}>Đã lưu cùng giao dịch này</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReceiptImage(null)}
+                style={{
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#f87171',
+                  borderRadius: '6px',
+                  padding: '4px 10px',
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                }}
+              >
+                Gỡ ảnh
+              </button>
+            </div>
+          ) : (
+            <div>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '8px 12px',
+                  borderRadius: '10px',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px dashed rgba(255, 255, 255, 0.2)',
+                  color: '#94a3b8',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                <span>📷 Đính kèm ảnh hóa đơn mới</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      const r = new FileReader();
+                      r.onload = () => setReceiptImage(r.result as string);
+                      r.readAsDataURL(f);
+                    }
+                  }}
+                />
+              </label>
+            </div>
+          )}
 
           {/* Buttons: Hủy & Lưu Thay Đổi */}
           <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>

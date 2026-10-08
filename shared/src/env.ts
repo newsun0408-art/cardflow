@@ -13,7 +13,7 @@ export const env = defineEnvironments(
     uat: {
       gateway: 'https://uat-gateway.example.com',
       ssoIssuer: 'https://uat-sso.example.com',
-      webOrigin: 'http://localhost:3000',
+      webOrigin: 'http://localhost:31000',
     },
     beta: {
       gateway: 'https://beta-gateway.example.com',
@@ -33,6 +33,7 @@ export const env = defineEnvironments(
     overrides: {
       gateway: 'API_GATEWAY_URI',
       ssoIssuer: 'SSO_ISSUER_URI',
+      webOrigin: 'WEB_ORIGIN',
     },
   },
 );

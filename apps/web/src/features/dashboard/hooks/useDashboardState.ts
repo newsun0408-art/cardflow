@@ -1,0 +1,1052 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import type { CardDataModel } from '@/app/_components/AddCardModal';
+import type { CardTheme } from '@/app/_components/PersonalCard3D';
+import type { TransactionItem } from '@/features/transactions';
+import { formatTransactionDate } from '@/features/transactions';
+import type { DashboardTab, CardsViewMode } from '../types';
+import type { UserProfile, CardDto } from '@cardflow-app/shared';
+import {
+  DEFAULT_USER_PROFILE,
+  createApi,
+  getCards,
+  createCard,
+  getTransactions,
+  createTransaction,
+  updateTransaction,
+  deleteTransaction,
+  getGoogleDriveStatus,
+  saveCardsToSheet,
+  type SaveCardsToSheetInput,
+} from '@cardflow-app/shared';
+import { deleteGoogleDriveFileAction } from '@/app/actions/google-integration';
+
+export const INITIAL_CARDS: CardDataModel[] = [
+  {
+    id: 'card-1',
+    nickname: 'Thẻ Công Nghệ & Tiện Ích',
+    bankName: 'Cardflow Bank',
+    cardType: 'VISA PLATINUM',
+    lastFourDigits: '9921',
+    cardNumberFormatted: '•••• •••• •••• 9921',
+    nfcId: 'CF-NFC-9921-PL',
+    holderName: 'LÊ HUỲNH THUẬN',
+    expiryDate: '09/30',
+    cvv: '•••',
+    theme: 'dark-cyber',
+    isLocked: false,
+    isDefault: true,
+    balance: 25500000,
+    dailyLimit: 50000000,
+    spentToday: 14250000,
+    onlinePayment: true,
+    internationalPayment: true,
+    atmWithdrawal: true,
+    notificationsEnabled: true,
+    purpose: 'tech',
+    purposeLabel: 'Chuyên Công nghệ & Thiết bị',
+    purposeIcon: '💻',
+  },
+  {
+    id: 'card-2',
+    nickname: 'Thẻ Ăn Uống & Cafe',
+    bankName: 'Techcombank',
+    cardType: 'VISA GOLD',
+    lastFourDigits: '4412',
+    cardNumberFormatted: '•••• •••• •••• 4412',
+    nfcId: 'CF-NFC-4412-GD',
+    holderName: 'LÊ HUỲNH THUẬN',
+    expiryDate: '12/28',
+    cvv: '•••',
+    theme: 'gold-luxe',
+    isLocked: false,
+    isDefault: false,
+    balance: 12000000,
+    dailyLimit: 20000000,
+    spentToday: 3500000,
+    onlinePayment: true,
+    internationalPayment: false,
+    atmWithdrawal: true,
+    notificationsEnabled: true,
+    purpose: 'dining',
+    purposeLabel: 'Chuyên Ăn uống & Cà phê',
+    purposeIcon: '🍔',
+  },
+  {
+    id: 'card-3',
+    nickname: 'Thẻ Mua Sắm & Shopping',
+    bankName: 'Vietcombank',
+    cardType: 'MASTERCARD BLACK',
+    lastFourDigits: '8834',
+    cardNumberFormatted: '•••• •••• •••• 8834',
+    nfcId: 'CF-NFC-8834-SP',
+    holderName: 'LÊ HUỲNH THUẬN',
+    expiryDate: '05/29',
+    cvv: '•••',
+    theme: 'deep-sapphire',
+    isLocked: false,
+    isDefault: false,
+    balance: 8500000,
+    dailyLimit: 15000000,
+    spentToday: 0,
+    onlinePayment: false,
+    internationalPayment: false,
+    atmWithdrawal: false,
+    notificationsEnabled: false,
+    purpose: 'shopping',
+    purposeLabel: 'Chuyên Mua sắm & Shopping',
+    purposeIcon: '🛍️',
+  },
+];
+
+export const INITIAL_TRANSACTIONS: TransactionItem[] = [
+  { id: 'tx-101', cardId: 'card-1', cardLast4: '9921', merchant: 'Thế Giới Di Động - Laptop Pro', category: 'tech', categoryLabel: 'Công nghệ', amount: -12500000, type: 'expense', date: '2026-09-22', dateDisplay: '22/09/2026', time: '14:32', status: 'Thành công', referenceId: 'TXN-9921-88412' },
+  { id: 'tx-102', cardId: 'card-1', cardLast4: '9921', merchant: 'Starbucks Coffee Reserve', category: 'dining', categoryLabel: 'Ăn uống', amount: -185000, type: 'expense', date: '2026-09-22', dateDisplay: '22/09/2026', time: '09:15', status: 'Thành công', referenceId: 'TXN-9921-88390' },
+  { id: 'tx-103', cardId: 'card-2', cardLast4: '4412', merchant: 'Grab Car - Chuyến đi Q1', category: 'transport', categoryLabel: 'Di chuyển', amount: -145000, type: 'expense', date: '2026-09-22', dateDisplay: '22/09/2026', time: '08:40', status: 'Thành công', referenceId: 'TXN-4412-10492' },
+  { id: 'tx-104', cardId: 'card-1', cardLast4: '9921', merchant: 'Nạp tiền hoàn tức thời vCard', category: 'refund', categoryLabel: 'Hoàn tiền', amount: 500000, type: 'income', date: '2026-09-21', dateDisplay: '21/09/2026', time: '18:20', status: 'Thành công', referenceId: 'TXN-9921-77201' },
+  { id: 'tx-105', cardId: 'card-2', cardLast4: '4412', merchant: 'Uniqlo Vincom Landmark', category: 'shopping', categoryLabel: 'Mua sắm', amount: -2350000, type: 'expense', date: '2026-09-21', dateDisplay: '21/09/2026', time: '16:05', status: 'Thành công', referenceId: 'TXN-4412-09412' },
+  { id: 'tx-106', cardId: 'card-3', cardLast4: '8834', merchant: 'Apple Store Online Store', category: 'tech', categoryLabel: 'Công nghệ', amount: -4590000, type: 'expense', date: '2026-09-20', dateDisplay: '20/09/2026', time: '11:00', status: 'Thành công', referenceId: 'TXN-8834-00129' },
+  { id: 'tx-107', cardId: 'card-1', cardLast4: '9921', merchant: 'CGV Cinema Premiere', category: 'dining', categoryLabel: 'Giải trí', amount: -320000, type: 'expense', date: '2026-09-19', dateDisplay: '19/09/2026', time: '20:15', status: 'Thành công', referenceId: 'TXN-9921-65412' },
+];
+
+export function useDashboardState() {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
+  const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_USER_PROFILE);
+  const [cardsViewMode, setCardsViewMode] = useState<CardsViewMode>('grid');
+
+  const [cards, setCards] = useState<CardDataModel[]>(INITIAL_CARDS);
+  const [transactions, setTransactions] = useState<TransactionItem[]>(INITIAL_TRANSACTIONS);
+  const [activeCardId, setActiveCardId] = useState<string>('card-1');
+
+  // Sensitive details state
+  const [showSensitiveData, setShowSensitiveData] = useState(false);
+  const [decryptedSensitiveData, setDecryptedSensitiveData] = useState<Record<string, { fullCardNumber: string; cvv: string }>>({});
+  const [sensitiveCountdown, setSensitiveCountdown] = useState<number>(0);
+  const [isVerifyPinModalOpen, setIsVerifyPinModalOpen] = useState(false);
+  const [targetCardForPin, setTargetCardForPin] = useState<{ id: string; name: string } | null>(null);
+
+  // Balance privacy
+  const [isBalanceHidden, setIsBalanceHidden] = useState(false);
+
+  // Filters
+  const [txSearchQuery, setTxSearchQuery] = useState('');
+
+  // Modals
+  const [isAddCardOpen, setIsAddCardOpen] = useState(false);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [isLimitModalOpen, setIsLimitModalOpen] = useState(false);
+  const [isDetailCardModalOpen, setIsDetailCardModalOpen] = useState(false);
+  const [selectedTxDetail, setSelectedTxDetail] = useState<TransactionItem | null>(null);
+  const [txToEdit, setTxToEdit] = useState<TransactionItem | null>(null);
+  const [isEditTxModalOpen, setIsEditTxModalOpen] = useState(false);
+  const [txToDelete, setTxToDelete] = useState<TransactionItem | null>(null);
+  const [isDeleteTxModalOpen, setIsDeleteTxModalOpen] = useState(false);
+  const [isExportReportOpen, setIsExportReportOpen] = useState(false);
+  const [isImportSheetOpen, setIsImportSheetOpen] = useState(false);
+  const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
+  const [isStorageLoaded, setIsStorageLoaded] = useState(false);
+
+  // Google Drive & Sheets Sync
+  const [isSyncingToSheet, setIsSyncingToSheet] = useState(false);
+  const [isDeletingCardsSheet, setIsDeletingCardsSheet] = useState(false);
+  const [lastSheetUrl, setLastSheetUrl] = useState<string | null>(null);
+  const [isGoogleDriveConnected, setIsGoogleDriveConnected] = useState(false);
+
+  // Toast
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Check Google Drive status & listen for popup OAuth message
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedSheet = localStorage.getItem('cardflow_last_cards_sheet_url');
+      if (savedSheet) setLastSheetUrl(savedSheet);
+    }
+
+    try {
+      const api = createApi();
+      getGoogleDriveStatus(api)
+        .then((res) => {
+          if (res && res.connected) {
+            setIsGoogleDriveConnected(true);
+            if (res.state && typeof window !== 'undefined') {
+              localStorage.setItem('cardflow_google_state', res.state);
+            }
+          }
+        })
+        .catch(() => { });
+    } catch {
+      // Ignore
+    }
+
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data && e.data.type === 'GOOGLE_DRIVE_CONNECTED') {
+        setIsGoogleDriveConnected(true);
+        if (e.data.state && typeof window !== 'undefined') {
+          localStorage.setItem('cardflow_google_state', e.data.state);
+        }
+        showToast('✅ Đã kết nối Google Drive & Sheets thành công!');
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  // Sync profile, view mode, cards, and transactions from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('cardflow_user_profile');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.fullName) {
+            setUserProfile((prev) => ({
+              ...DEFAULT_USER_PROFILE,
+              ...prev,
+              ...parsed,
+              nickname: parsed.nickname || prev.nickname || (parsed.fullName ? parsed.fullName.toLowerCase().replace(/\s+/g, '_') : 'user'),
+              phone: parsed.phone || prev.phone || '',
+            }));
+          }
+        }
+
+        const savedView = localStorage.getItem('cardflow_cards_view_mode') as CardsViewMode | null;
+        if (savedView && ['grid', 'table', 'list'].includes(savedView)) {
+          setCardsViewMode(savedView);
+        }
+
+        const userId = localStorage.getItem('cardflow_user_id') || 'guest';
+        const isNewUser = localStorage.getItem('cardflow_is_new_user') === 'true';
+
+        if (isNewUser) {
+          // Tài khoản mới tạo: Bắt đầu hoàn toàn trống để người dùng tự thêm thẻ
+          setCards([]);
+          setTransactions([]);
+          setActiveCardId('');
+          setIsStorageLoaded(true);
+          return;
+        }
+
+        const cardsKey = `cardflow_cards_${userId}`;
+        const txsKey = `cardflow_txs_${userId}`;
+        const savedCards = localStorage.getItem(cardsKey);
+        const savedTxs = localStorage.getItem(txsKey);
+
+        if (savedCards !== null) {
+          const parsedCards = JSON.parse(savedCards);
+          if (Array.isArray(parsedCards)) {
+            setCards(parsedCards);
+            if (parsedCards.length > 0) {
+              setActiveCardId(parsedCards[0].id);
+            } else {
+              setActiveCardId('');
+            }
+          }
+        }
+
+        if (savedTxs !== null) {
+          const parsedTxs = JSON.parse(savedTxs);
+          if (Array.isArray(parsedTxs)) {
+            const normalizedTxs = parsedTxs.map((t: TransactionItem) => ({
+              ...t,
+              dateDisplay: formatTransactionDate(t.date, t.dateDisplay),
+            }));
+            setTransactions(normalizedTxs);
+          }
+        }
+      } catch {
+        // Ignore
+      }
+      setIsStorageLoaded(true);
+    }
+  }, []);
+
+  // Save cards to localStorage whenever cards change
+  useEffect(() => {
+    if (typeof window === 'undefined' || !isStorageLoaded) return;
+    try {
+      const userId = localStorage.getItem('cardflow_user_id') || 'guest';
+      localStorage.setItem(`cardflow_cards_${userId}`, JSON.stringify(cards));
+      if (cards.length > 0) {
+        localStorage.removeItem('cardflow_is_new_user');
+      }
+    } catch { }
+  }, [cards, isStorageLoaded]);
+
+  // Save transactions to localStorage whenever transactions change
+  useEffect(() => {
+    if (typeof window === 'undefined' || !isStorageLoaded) return;
+    try {
+      const userId = localStorage.getItem('cardflow_user_id') || 'guest';
+      localStorage.setItem(`cardflow_txs_${userId}`, JSON.stringify(transactions));
+    } catch { }
+  }, [transactions, isStorageLoaded]);
+
+  // Backend Connection Status
+  const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'offline'>('checking');
+
+  // Sync with Go backend
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && localStorage.getItem('cardflow_is_new_user') === 'true') {
+        setBackendStatus('connected');
+        return;
+      }
+      const api = createApi();
+      getCards(api)
+        .then((res: any) => {
+          const cardsList: CardDto[] = Array.isArray(res) ? res : (res?.data ?? []);
+          if (cardsList && cardsList.length > 0) {
+            console.log('[Cardflow API] Connected! Fetched cards from Go backend:', cardsList);
+            setBackendStatus('connected');
+            const liveCards: CardDataModel[] = cardsList.map((c, idx) => ({
+              id: c.id,
+              nickname: c.cardType === 'BLACK_TITANIUM' ? 'Thẻ Chính Titanium' : 'Thẻ Phụ Cyber',
+              bankName: 'Cardflow Bank',
+              cardType: c.cardType,
+              lastFourDigits: c.cardNumber.replace(/\s+/g, '').slice(-4),
+              cardNumberFormatted: '•••• •••• •••• ' + c.cardNumber.replace(/\s+/g, '').slice(-4),
+              nfcId: `CF-NFC-${c.id}`,
+              holderName: c.cardHolder,
+              expiryDate: c.expiry,
+              cvv: '•••',
+              theme: idx % 2 === 0 ? 'dark-cyber' : 'holographic',
+              isLocked: c.status === 'LOCKED',
+              isDefault: idx === 0,
+              balance: c.balance,
+              dailyLimit: c.spendingLimit,
+              spentToday: 0,
+              onlinePayment: true,
+              internationalPayment: true,
+              atmWithdrawal: true,
+              notificationsEnabled: true,
+              createdAt: '2026-09-01',
+              purpose: idx % 2 === 0 ? 'tech' : 'dining',
+              purposeLabel: idx % 2 === 0 ? 'Chuyên Công nghệ & Thiết bị' : 'Chuyên Ăn uống & Cà phê',
+              purposeIcon: idx % 2 === 0 ? '💻' : '🍔',
+            }));
+            setCards(liveCards);
+            setActiveCardId(liveCards[0]?.id ?? 'card-1');
+          }
+        })
+        .catch((err) => {
+          console.warn('[Cardflow API] Could not fetch cards, using local mock:', err);
+          setBackendStatus('offline');
+        });
+
+      getTransactions(api)
+        .then((res: any) => {
+          const txList: any[] = Array.isArray(res) ? res : (res?.data ?? []);
+          if (txList && txList.length > 0) {
+            console.log('[Cardflow API] Connected! Fetched transactions from Go backend:', txList);
+            const catMap: Record<string, { cat: TransactionItem['category']; label: string }> = {
+              TECHNOLOGY: { cat: 'tech', label: 'Công nghệ' },
+              FOOD: { cat: 'dining', label: 'Ăn uống' },
+              TRANSPORT: { cat: 'transport', label: 'Di chuyển' },
+              HOUSING: { cat: 'housing', label: 'Nhà cửa' },
+              OTHER: { cat: 'other', label: 'Còn lại' },
+            };
+            const liveTxs: TransactionItem[] = txList.map((t) => {
+              const mapped = catMap[t.category] || { cat: 'other', label: t.category };
+              const datePart = t.createdAt ? t.createdAt.split(' ')[0] : '2026-09-23';
+              const timePart = t.createdAt ? t.createdAt.split(' ')[1]?.slice(0, 5) ?? '12:00' : '12:00';
+              return {
+                id: t.id,
+                cardId: t.cardId || 'card-1',
+                cardLast4: '9921',
+                merchant: t.title,
+                category: mapped.cat,
+                categoryLabel: mapped.label,
+                amount: t.type === 'EXPENSE' ? -Math.abs(t.amount) : Math.abs(t.amount),
+                type: t.type === 'EXPENSE' ? 'expense' : 'income',
+                date: datePart,
+                dateDisplay: formatTransactionDate(datePart),
+                time: timePart,
+                status: t.status === 'SUCCESS' ? 'Thành công' : 'Đang xử lý',
+                referenceId: `TXN-${t.id.slice(0, 8).toUpperCase()}`,
+              };
+            });
+            setTransactions(liveTxs);
+          }
+        })
+        .catch((err) => {
+          console.warn('[Cardflow API] Could not fetch transactions, using local mock:', err);
+        });
+    } catch (e) {
+      console.warn('[Cardflow API] Backend connection init error:', e);
+      setBackendStatus('offline');
+    }
+  }, []);
+
+  // Countdown timer for sensitive data auto-mask
+  useEffect(() => {
+    if (!showSensitiveData || sensitiveCountdown <= 0) return;
+
+    const timer = setInterval(() => {
+      setSensitiveCountdown((prev) => {
+        if (prev <= 1) {
+          setShowSensitiveData(false);
+          setDecryptedSensitiveData({});
+          showToast('🔒 Đã tự động ẩn và xóa dữ liệu nhạy cảm khỏi bộ nhớ');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [showSensitiveData, sensitiveCountdown]);
+
+  const activeCard: CardDataModel = (cards.find((c) => c.id === activeCardId) || cards[0] || (cards.length > 0 ? cards[0] : null)) as any;
+
+  const handleCardsViewModeChange = (mode: CardsViewMode) => {
+    setCardsViewMode(mode);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('cardflow_cards_view_mode', mode);
+      } catch {
+        // Ignore
+      }
+    }
+  };
+
+  const handleSelectCard = (id: string, openDetailModal = false) => {
+    setActiveCardId(id);
+    setShowSensitiveData(false);
+    setDecryptedSensitiveData({});
+    setSensitiveCountdown(0);
+    if (openDetailModal) {
+      setIsDetailCardModalOpen(true);
+    }
+  };
+
+  const handleRequestToggleSensitive = (cardId: string, cardName: string) => {
+    if (showSensitiveData && decryptedSensitiveData[cardId]) {
+      setShowSensitiveData(false);
+      setDecryptedSensitiveData((prev) => {
+        const next = { ...prev };
+        delete next[cardId];
+        return next;
+      });
+      setSensitiveCountdown(0);
+      showToast('🔒 Đã bảo mật và ẩn thông tin thẻ');
+      return;
+    }
+
+    setTargetCardForPin({ id: cardId, name: cardName });
+    setIsVerifyPinModalOpen(true);
+  };
+
+  const handleVerifyPinSuccess = (result: {
+    decryptedData?: { fullCardNumber: string; cvv: string };
+    expiresInSeconds?: number;
+  }) => {
+    if (!targetCardForPin || !result.decryptedData) return;
+
+    const cardId = targetCardForPin.id;
+    const expiresSec = result.expiresInSeconds || 90;
+
+    setDecryptedSensitiveData((prev) => ({
+      ...prev,
+      [cardId]: result.decryptedData!,
+    }));
+    setShowSensitiveData(true);
+    setSensitiveCountdown(expiresSec);
+    showToast(`🔓 Xác thực thành công. Thông tin thẻ sẽ tự ẩn sau ${expiresSec}s`);
+  };
+
+  const handleToggleLock = (_id: string) => {
+    showToast('⚡ Thẻ luôn ở trạng thái hoạt động (không khóa thẻ)');
+  };
+
+  const handleSetDefaultCard = (id: string) => {
+    setCards((prev) =>
+      prev.map((c) => ({
+        ...c,
+        isDefault: c.id === id,
+      }))
+    );
+    showToast('⭐ Đã đặt làm thẻ cá nhân mặc định');
+  };
+
+  const handleToggleSecuritySetting = (id: string, key: 'onlinePayment' | 'internationalPayment' | 'atmWithdrawal' | 'notificationsEnabled') => {
+    setCards((prev) =>
+      prev.map((c) => {
+        if (c.id === id) {
+          const nextVal = !c[key];
+          showToast(`⚡ Cập nhật tính năng bảo mật: ${key} = ${nextVal ? 'BẬT' : 'TẮT'}`);
+          return { ...c, [key]: nextVal };
+        }
+        return c;
+      })
+    );
+  };
+
+  const handleDeleteCard = (id: string) => {
+    if (cards.length <= 1) {
+      showToast('⚠️ Bạn phải duy trì ít nhất 1 Thẻ Cá Nhân trong tài khoản!');
+      return;
+    }
+    if (confirm('Bạn có chắc chắn muốn xóa thẻ cá nhân này khỏi hệ thống?')) {
+      const remaining = cards.filter((c) => c.id !== id);
+      setCards(remaining);
+      if (activeCardId === id && remaining[0]) {
+        setActiveCardId(remaining[0].id);
+      }
+      showToast('🗑️ Đã xóa thẻ cá nhân thành công');
+    }
+  };
+
+  const handleUpdateCard = (id: string, updatedFields: Partial<CardDataModel>) => {
+    setCards((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, ...updatedFields } : c))
+    );
+    showToast('✨ Đã cập nhật thông tin thẻ thành công');
+  };
+
+  const handleImportTransactionsSuccess = (
+    newTransactions: TransactionItem[],
+    targetCardId?: string,
+  ) => {
+    if (!newTransactions || newTransactions.length === 0) return;
+
+    setTransactions((prev) => {
+      const existingRefs = new Set(prev.map((t) => t.referenceId));
+      const toAdd = newTransactions.filter((t) => !existingRefs.has(t.referenceId));
+      return [...toAdd, ...prev];
+    });
+
+    const addedExpensesByCard: Record<string, number> = {};
+    newTransactions.forEach((tx) => {
+      if (tx.amount < 0) {
+        const cid = targetCardId || tx.cardId;
+        addedExpensesByCard[cid] = (addedExpensesByCard[cid] || 0) + Math.abs(tx.amount);
+      }
+    });
+
+    if (Object.keys(addedExpensesByCard).length > 0) {
+      setCards((prev) =>
+        prev.map((c) => {
+          const added = addedExpensesByCard[c.id];
+          if (added) {
+            return { ...c, spentToday: c.spentToday + added };
+          }
+          return c;
+        }),
+      );
+    }
+
+    showToast(`📊 Đã nhập thành công ${newTransactions.length} giao dịch từ Google Sheet!`);
+  };
+
+  const handleAddCard = (newCardData: Omit<CardDataModel, 'id' | 'isLocked' | 'balance' | 'spentToday'>) => {
+    const newId = `card-${Date.now()}`;
+    const newCard: CardDataModel = {
+      ...newCardData,
+      id: newId,
+      isLocked: false,
+      balance: 10000000,
+      spentToday: 0,
+    };
+    setCards((prev) => [...prev, newCard]);
+    setActiveCardId(newId);
+    showToast(`✨ Đã thêm thẻ cá nhân mới "${newCard.nickname}" thành công`);
+
+    try {
+      const api = createApi();
+      createCard(api, {
+        cardHolder: newCardData.holderName || userProfile.fullName || 'LE HUYNH THUAN',
+        cardType: newCardData.cardType,
+        spendingLimit: newCardData.dailyLimit || 50000000,
+      })
+        .then((res: any) => {
+          const cardObj = res?.id ? res : res?.data;
+          if (cardObj?.id) {
+            setCards((prev) =>
+              prev.map((c) =>
+                c.id === newId
+                  ? {
+                    ...c,
+                    id: cardObj.id,
+                    cardNumberFormatted: '•••• •••• •••• ' + cardObj.cardNumber.replace(/\s+/g, '').slice(-4),
+                    lastFourDigits: cardObj.cardNumber.replace(/\s+/g, '').slice(-4),
+                  }
+                  : c
+              )
+            );
+          }
+        })
+        .catch(() => { });
+    } catch {
+      // Ignore network errors
+    }
+
+    if (newCardData.syncToSheet) {
+      handleSaveCardsToGoogleSheet([...cards, newCard]).catch(() => { });
+    }
+  };
+
+  const handleAddTransaction = (newTxData: Omit<TransactionItem, 'id' | 'referenceId' | 'status'>) => {
+    const newTx: TransactionItem = {
+      ...newTxData,
+      id: `tx-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+      referenceId: `TXN-${newTxData.cardLast4}-${Math.floor(10000 + Math.random() * 90000)}`,
+      dateDisplay: formatTransactionDate(newTxData.date, newTxData.dateDisplay),
+      status: 'Thành công',
+    };
+    setTransactions((prev) => [newTx, ...prev]);
+
+    try {
+      const api = createApi();
+      const catReverse: Record<string, string> = {
+        tech: 'TECHNOLOGY',
+        dining: 'FOOD',
+        transport: 'TRANSPORT',
+        housing: 'HOUSING',
+        other: 'OTHER',
+      };
+      createTransaction(api, {
+        cardId: newTxData.cardId,
+        title: newTxData.merchant,
+        amount: Math.abs(newTxData.amount),
+        type: newTxData.type === 'expense' ? 'EXPENSE' : 'INCOME',
+        category: catReverse[newTxData.category] || 'OTHER',
+        note: 'Created via Web Dashboard',
+      }).catch(() => { });
+    } catch {
+      // Network ignore
+    }
+
+    if (newTx.type === 'expense') {
+      setCards((prev) =>
+        prev.map((c) =>
+          c.id === newTx.cardId
+            ? { ...c, spentToday: c.spentToday + Math.abs(newTx.amount) }
+            : c
+        )
+      );
+    }
+  };
+
+  const handleAddBatchTransactions = (newTxsData: Omit<TransactionItem, 'id' | 'referenceId' | 'status'>[]) => {
+    if (!newTxsData || newTxsData.length === 0) return;
+
+    const createdTxs: TransactionItem[] = newTxsData.map((data, idx) => ({
+      ...data,
+      id: `tx-${Date.now()}-${idx}-${Math.floor(100 + Math.random() * 900)}`,
+      referenceId: `TXN-${data.cardLast4}-${Math.floor(10000 + Math.random() * 90000)}`,
+      dateDisplay: formatTransactionDate(data.date, data.dateDisplay),
+      status: 'Thành công',
+    }));
+
+    setTransactions((prev) => [...createdTxs, ...prev]);
+
+    // Update spentToday for respective cards
+    const expensesByCard: Record<string, number> = {};
+    createdTxs.forEach((tx) => {
+      if (tx.type === 'expense') {
+        expensesByCard[tx.cardId] = (expensesByCard[tx.cardId] || 0) + Math.abs(tx.amount);
+      }
+    });
+
+    if (Object.keys(expensesByCard).length > 0) {
+      setCards((prev) =>
+        prev.map((c) => {
+          const added = expensesByCard[c.id];
+          if (added) {
+            return { ...c, spentToday: c.spentToday + added };
+          }
+          return c;
+        })
+      );
+    }
+
+    // Attempt backend sync in background
+    try {
+      const api = createApi();
+      const catReverse: Record<string, string> = {
+        tech: 'TECHNOLOGY',
+        dining: 'FOOD',
+        transport: 'TRANSPORT',
+        housing: 'HOUSING',
+        other: 'OTHER',
+      };
+      createdTxs.forEach((tx) => {
+        createTransaction(api, {
+          cardId: tx.cardId,
+          title: tx.merchant,
+          amount: Math.abs(tx.amount),
+          type: tx.type === 'expense' ? 'EXPENSE' : 'INCOME',
+          category: catReverse[tx.category] || 'OTHER',
+          note: 'Batch Receipt Scan',
+        }).catch(() => { });
+      });
+    } catch { }
+  };
+
+  const handleUpdateTransaction = (updatedTx: TransactionItem) => {
+    const normalizedTx: TransactionItem = {
+      ...updatedTx,
+      dateDisplay: formatTransactionDate(updatedTx.date, updatedTx.dateDisplay),
+    };
+    const oldTx = transactions.find((t) => t.id === normalizedTx.id);
+
+    setTransactions((prev) =>
+      prev.map((t) => (t.id === normalizedTx.id ? normalizedTx : t))
+    );
+
+    if (oldTx) {
+      const oldExpense = oldTx.type === 'expense' ? Math.abs(oldTx.amount) : 0;
+      const newExpense = updatedTx.type === 'expense' ? Math.abs(updatedTx.amount) : 0;
+
+      if (oldTx.cardId === updatedTx.cardId) {
+        const delta = newExpense - oldExpense;
+        if (delta !== 0) {
+          setCards((prev) =>
+            prev.map((c) =>
+              c.id === updatedTx.cardId
+                ? { ...c, spentToday: Math.max(0, c.spentToday + delta) }
+                : c
+            )
+          );
+        }
+      } else {
+        setCards((prev) =>
+          prev.map((c) => {
+            if (c.id === oldTx.cardId) {
+              return { ...c, spentToday: Math.max(0, c.spentToday - oldExpense) };
+            }
+            if (c.id === updatedTx.cardId) {
+              return { ...c, spentToday: c.spentToday + newExpense };
+            }
+            return c;
+          })
+        );
+      }
+    }
+
+    if (selectedTxDetail && selectedTxDetail.id === updatedTx.id) {
+      setSelectedTxDetail(updatedTx);
+    }
+
+    try {
+      const api = createApi();
+      const catReverse: Record<string, string> = {
+        tech: 'TECHNOLOGY',
+        dining: 'FOOD',
+        transport: 'TRANSPORT',
+        housing: 'HOUSING',
+        other: 'OTHER',
+      };
+      updateTransaction(api, updatedTx.id, {
+        cardId: updatedTx.cardId,
+        title: updatedTx.merchant,
+        amount: Math.abs(updatedTx.amount),
+        type: updatedTx.type === 'expense' ? 'EXPENSE' : 'INCOME',
+        category: catReverse[updatedTx.category] || 'OTHER',
+        status: updatedTx.status === 'Thành công' ? 'SUCCESS' : updatedTx.status === 'Đang xử lý' ? 'PENDING' : 'FAILED',
+        note: 'Updated via Web Dashboard',
+      }).catch(() => { });
+    } catch {
+      // Ignore
+    }
+
+    showToast(`✏️ Đã cập nhật giao dịch "${updatedTx.merchant}"`);
+  };
+
+  const handleDeleteTransaction = (txId: string) => {
+    const txToDelete = transactions.find((t) => t.id === txId);
+    if (!txToDelete) return;
+
+    setTransactions((prev) => prev.filter((t) => t.id !== txId));
+
+    if (txToDelete.type === 'expense') {
+      const expenseAmount = Math.abs(txToDelete.amount);
+      setCards((prev) =>
+        prev.map((c) =>
+          c.id === txToDelete.cardId
+            ? { ...c, spentToday: Math.max(0, c.spentToday - expenseAmount) }
+            : c
+        )
+      );
+    }
+
+    if (selectedTxDetail && selectedTxDetail.id === txId) {
+      setSelectedTxDetail(null);
+    }
+
+    try {
+      const api = createApi();
+      deleteTransaction(api, txId).catch(() => { });
+    } catch {
+      // Ignore
+    }
+
+    showToast(`🗑️ Đã xóa giao dịch "${txToDelete.merchant}"`);
+  };
+
+  const handleOpenEditTx = (tx: TransactionItem) => {
+    setTxToEdit(tx);
+    setIsEditTxModalOpen(true);
+  };
+
+  const handleOpenDeleteTx = (tx: TransactionItem) => {
+    setTxToDelete(tx);
+    setIsDeleteTxModalOpen(true);
+  };
+
+  const handleProfileSave = (updated: UserProfile) => {
+    setUserProfile(updated);
+    setCards((prev) =>
+      prev.map((c) => ({
+        ...c,
+        holderName: updated.fullName.toUpperCase(),
+      }))
+    );
+    showToast(`✨ Đã cập nhật hồ sơ: ${updated.fullName}`);
+  };
+
+  const handleToggleHideBalance = () => {
+    setIsBalanceHidden((prev) => {
+      const next = !prev;
+      showToast(next ? '🔒 Đã ẩn số dư tài khoản' : '👁️ Đã hiển thị số dư tài khoản');
+      return next;
+    });
+  };
+
+  const getCardMiniGradient = (theme: CardTheme) => {
+    switch (theme) {
+      case 'gold-elegance':
+      case 'gold-luxe':
+        return 'linear-gradient(135deg, #d4af37, #78350f)';
+      case 'crimson-ruby':
+        return 'linear-gradient(135deg, #ef4444, #7f1d1d)';
+      case 'deep-sapphire':
+        return 'linear-gradient(135deg, #0284c7, #1e3a8a)';
+      case 'holographic':
+        return 'linear-gradient(135deg, #ec4899, #8b5cf6)';
+      case 'dark-cyber':
+      default:
+        return 'linear-gradient(135deg, #06b6d4, #0f172a)';
+    }
+  };
+
+  const getUserInitials = (name: string) => {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      const first = parts[parts.length - 2]?.[0] ?? '';
+      const second = parts[parts.length - 1]?.[0] ?? '';
+      return (first + second).toUpperCase() || 'CF';
+    }
+    return (parts[0]?.[0] ?? 'CF').toUpperCase();
+  };
+
+  const filteredTransactions = transactions.filter((tx) => {
+    if (!txSearchQuery) return true;
+    const q = txSearchQuery.toLowerCase().trim();
+    const matchMerchant = tx.merchant.toLowerCase().includes(q);
+    const matchCategory = tx.categoryLabel.toLowerCase().includes(q) || tx.category.toLowerCase().includes(q);
+    const matchCardLast4 = tx.cardLast4.includes(q);
+    const matchRef = tx.referenceId.toLowerCase().includes(q);
+    return matchMerchant || matchCategory || matchCardLast4 || matchRef;
+  });
+
+  const handleConnectGoogleDrive = () => {
+    const w = 550, h = 650;
+    const left = window.screen.width / 2 - w / 2;
+    const top = window.screen.height / 2 - h / 2;
+    window.open(
+      'http://localhost:8080/cardflow-backend/v1/drive/actions/connect?redirect=true',
+      'ConnectGoogleDrive',
+      `width=${w},height=${h},top=${top},left=${left},scrollbars=yes,resizable=yes`
+    );
+  };
+
+  const handleSaveCardsToGoogleSheet = async (customCards?: CardDataModel[]) => {
+    setIsSyncingToSheet(true);
+    const targetCards = customCards || cards;
+    try {
+      const api = createApi();
+      let state = typeof window !== 'undefined' ? localStorage.getItem('cardflow_google_state') || '' : '';
+      if (!state) {
+        const driveStatus = await getGoogleDriveStatus(api);
+        if (driveStatus && driveStatus.state) {
+          state = driveStatus.state;
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('cardflow_google_state', state);
+          }
+        }
+      }
+      const payload: SaveCardsToSheetInput = {
+        state,
+        cards: targetCards.map((c) => ({
+          id: c.id,
+          nickname: c.nickname,
+          bankName: c.bankName,
+          cardType: c.cardType,
+          cardCategory: c.cardCategory || 'international',
+          cardNetwork: c.cardNetwork || c.cardType,
+          cardNumber: c.cardNumberFormatted || `•••• •••• •••• ${c.lastFourDigits}`,
+          holderName: c.holderName || userProfile.fullName || 'LE HUYNH THUAN',
+          expiryOrIssueDate: c.expiryDate || c.issueDate || '09/30',
+          balance: c.balance,
+          dailyLimit: c.dailyLimit,
+          status: c.isLocked ? 'Đã khóa' : 'Hoạt động',
+        })),
+      };
+
+      const res = await saveCardsToSheet(api, payload);
+      setIsGoogleDriveConnected(true);
+      if (res.spreadsheetUrl) {
+        setLastSheetUrl(res.spreadsheetUrl);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('cardflow_last_cards_sheet_url', res.spreadsheetUrl);
+          if (res.spreadsheetId) {
+            localStorage.setItem('cardflow_last_cards_sheet_id', res.spreadsheetId);
+          }
+        }
+      }
+      showToast(`📊 Đã lưu thành công ${targetCards.length} thẻ vào Google Sheet!`);
+      return res;
+    } catch (err: any) {
+      const errMsg = err?.message || err?.error || '';
+      if (errMsg.includes('chưa được kết nối') || errMsg.includes('not connected')) {
+        showToast('⚠️ Bạn chưa kết nối Google. Đang mở trang kết nối...');
+        handleConnectGoogleDrive();
+      } else {
+        showToast(`❌ Không thể lưu thẻ vào Google Sheet: ${errMsg || 'Lỗi kết nối'}`);
+      }
+      throw err;
+    } finally {
+      setIsSyncingToSheet(false);
+    }
+  };
+
+  const handleDeleteCardsSheet = async () => {
+    if (!lastSheetUrl) return;
+    setIsDeletingCardsSheet(true);
+    try {
+      let fileId = typeof window !== 'undefined' ? localStorage.getItem('cardflow_last_cards_sheet_id') : null;
+      if (!fileId && lastSheetUrl) {
+        const match = lastSheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+        if (match && match[1]) fileId = match[1];
+      }
+
+      let state = typeof window !== 'undefined' ? localStorage.getItem('cardflow_google_state') : null;
+      if (!state) {
+        const api = createApi();
+        const status = await getGoogleDriveStatus(api);
+        state = status?.state || null;
+      }
+
+      if (fileId && state) {
+        const delRes = await deleteGoogleDriveFileAction({ state, fileId });
+        if (!delRes.success) {
+          console.warn('Could not delete sheet file from Google Drive:', delRes.error);
+        }
+      }
+
+      setLastSheetUrl(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('cardflow_last_cards_sheet_url');
+        localStorage.removeItem('cardflow_last_cards_sheet_id');
+      }
+      showToast('🗑️ Đã xóa Google Sheet danh sách thẻ thành công!');
+    } catch (err: any) {
+      console.error('Error deleting cards sheet:', err);
+      setLastSheetUrl(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('cardflow_last_cards_sheet_url');
+        localStorage.removeItem('cardflow_last_cards_sheet_id');
+      }
+      showToast('🗑️ Đã xóa liên kết Google Sheet danh sách thẻ!');
+    } finally {
+      setIsDeletingCardsSheet(false);
+    }
+  };
+
+  return {
+    backendStatus,
+    isSidebarCollapsed,
+    setIsSidebarCollapsed,
+    activeTab,
+    setActiveTab,
+    userProfile,
+    cardsViewMode,
+    cards,
+    setCards,
+    transactions,
+    activeCardId,
+    activeCard,
+    showSensitiveData,
+    decryptedSensitiveData,
+    sensitiveCountdown,
+    isVerifyPinModalOpen,
+    setIsVerifyPinModalOpen,
+    targetCardForPin,
+    isBalanceHidden,
+    txSearchQuery,
+    setTxSearchQuery,
+    isAddCardOpen,
+    setIsAddCardOpen,
+    isPinModalOpen,
+    setIsPinModalOpen,
+    isLimitModalOpen,
+    setIsLimitModalOpen,
+    isDetailCardModalOpen,
+    setIsDetailCardModalOpen,
+    selectedTxDetail,
+    setSelectedTxDetail,
+    txToEdit,
+    setTxToEdit,
+    isEditTxModalOpen,
+    setIsEditTxModalOpen,
+    txToDelete,
+    setTxToDelete,
+    isDeleteTxModalOpen,
+    setIsDeleteTxModalOpen,
+    handleOpenEditTx,
+    handleOpenDeleteTx,
+    isExportReportOpen,
+    setIsExportReportOpen,
+    isImportSheetOpen,
+    setIsImportSheetOpen,
+    isGuideModalOpen,
+    setIsGuideModalOpen,
+    handleImportTransactionsSuccess,
+    toastMessage,
+    showToast,
+    isSyncingToSheet,
+    isDeletingCardsSheet,
+    lastSheetUrl,
+    isGoogleDriveConnected,
+    handleConnectGoogleDrive,
+    handleSaveCardsToGoogleSheet,
+    handleDeleteCardsSheet,
+    handleCardsViewModeChange,
+    handleSelectCard,
+    handleRequestToggleSensitive,
+    handleVerifyPinSuccess,
+    handleToggleLock,
+    handleSetDefaultCard,
+    handleToggleSecuritySetting,
+    handleDeleteCard,
+    handleUpdateCard,
+    handleAddCard,
+    handleAddTransaction,
+    handleAddBatchTransactions,
+    handleUpdateTransaction,
+    handleDeleteTransaction,
+    handleProfileSave,
+    handleToggleHideBalance,
+    getCardMiniGradient,
+    getUserInitials,
+    filteredTransactions,
+  };
+}

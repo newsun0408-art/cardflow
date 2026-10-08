@@ -1,13 +1,24 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import {
   CloseOutlined,
   FileTextOutlined,
   DownloadOutlined,
   PrinterOutlined,
-  ArrowDownOutlined,
-  ArrowUpOutlined
+  CloudUploadOutlined,
+  TableOutlined,
+  LoadingOutlined,
+  LinkOutlined,
+  GoogleOutlined,
 } from '@ant-design/icons';
+import {
+  exportToGoogleSheetAction,
+  getGoogleAuthUrlAction,
+  checkGoogleConnectionStatusAction,
+  getGoogleDriveStatusAction,
+} from '../actions/google-integration';
+import { formatTransactionDate } from '@/features/transactions';
 
 export interface ReportTransactionItem {
   id: string;
@@ -31,6 +42,7 @@ interface ExportReportModalProps {
   holderName?: string;
   activeCardName?: string;
   onClose: () => void;
+  onOpenImportSheet?: () => void;
   onToast: (msg: string) => void;
 }
 
@@ -40,8 +52,45 @@ export function ExportReportModal({
   holderName = 'LÊ HUỲNH THUẬN',
   activeCardName = 'Tất cả các thẻ',
   onClose,
+  onOpenImportSheet: _onOpenImportSheet,
   onToast,
 }: ExportReportModalProps) {
+
+  const [isExportingSheet, setIsExportingSheet] = useState(false);
+  const [lastSheetUrl, setLastSheetUrl] = useState<string | null>(null);
+  const [lastDriveUrl] = useState<string | null>(null);
+
+  // Google OAuth Connection State via Go Backend
+  const [googleState, setGoogleState] = useState<string | null>(null);
+  const [isGoogleConnected, setIsGoogleConnected] = useState(false);
+  const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
+  const [isCheckingGoogle, setIsCheckingGoogle] = useState(true);
+
+  // Kiểm tra kết nối từ localStorage và kiểm tra trạng thái với Go Backend
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (typeof window !== 'undefined') {
+      const savedState = localStorage.getItem('cardflow_google_state');
+      setIsCheckingGoogle(true);
+      getGoogleDriveStatusAction().then((status) => {
+        if (status.connected && status.state) {
+          setIsGoogleConnected(true);
+          setGoogleState(status.state);
+          localStorage.setItem('cardflow_google_state', status.state);
+        } else if (savedState) {
+          setGoogleState(savedState);
+          checkGoogleConnectionStatusAction(savedState).then((res) => {
+            setIsGoogleConnected(res.connected);
+          });
+        } else {
+          setIsGoogleConnected(false);
+        }
+        setIsCheckingGoogle(false);
+      });
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const totalExpense = transactions
@@ -60,6 +109,24 @@ export function ExportReportModal({
 
   // Export CSV Handler (UTF-8 BOM for correct Vietnamese Excel display)
   const handleDownloadCSV = () => {
+    const csvContent = generateCSVContent();
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute(
+      'download',
+      `Sao_Ke_Giao_Dich_Cardflow_${new Date().toISOString().slice(0, 10)}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    onToast('📥 Đã tải xuống file sao kê CSV (Excel) thành công!');
+  };
+
+  const generateCSVContent = () => {
     const headers = [
       'STT',
       'Mã Giao Dịch',
@@ -86,24 +153,147 @@ export function ExportReportModal({
       `"${tx.status}"`,
     ]);
 
-    const csvContent =
+    return (
       '\uFEFF' +
-      [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute(
-      'download',
-      `Sao_Ke_Giao_Dich_Cardflow_${new Date().toISOString().slice(0, 10)}.csv`
+      [headers.join(','), ...rows.map((row) => row.join(','))].join('\n')
     );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  };
 
-    onToast('📥 Đã tải xuống file sao kê CSV (Excel) thành công!');
+  // Google OAuth Connect Handler via Go Backend
+  const handleConnectGoogle = async () => {
+    setIsConnectingGoogle(true);
+    try {
+      const res = await getGoogleAuthUrlAction();
+      const authUrl = res.success && res.authUrl
+        ? res.authUrl
+        : 'http://localhost:8080/cardflow-backend/v1/drive/actions/connect?redirect=true';
+      const state = res.state || 'drive-auth';
+
+      if (res.state) {
+        localStorage.setItem('cardflow_google_state', state);
+        setGoogleState(state);
+      }
+
+      // Mở cửa sổ popup cấp quyền Google
+      const width = 560;
+      const height = 680;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      const popup = window.open(
+        authUrl,
+        'CardflowGoogleOAuth',
+        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+      );
+
+      // Thăm dò kiểm tra trạng thái token & thư mục CardFlow từ Go Backend
+      let attempts = 0;
+      const maxAttempts = 45; // ~60s
+      const pollTimer = setInterval(async () => {
+        attempts++;
+        try {
+          const status = await getGoogleDriveStatusAction();
+          if (status.connected) {
+            clearInterval(pollTimer);
+            try {
+              popup?.close();
+            } catch {}
+            setIsGoogleConnected(true);
+            if (status.state) {
+              setGoogleState(status.state);
+              localStorage.setItem('cardflow_google_state', status.state);
+            }
+            setIsConnectingGoogle(false);
+            onToast('🎉 Kết nối Google Drive & Sheets thành công! Thư mục "CardFlow" đã sẵn sàng.');
+          } else if (attempts >= maxAttempts || (popup && popup.closed)) {
+            const finalCheck = await getGoogleDriveStatusAction();
+            if (finalCheck.connected) {
+              clearInterval(pollTimer);
+              setIsGoogleConnected(true);
+              if (finalCheck.state) {
+                setGoogleState(finalCheck.state);
+                localStorage.setItem('cardflow_google_state', finalCheck.state);
+              }
+              setIsConnectingGoogle(false);
+              onToast('🎉 Kết nối Google Drive & Sheets thành công! Thư mục "CardFlow" đã sẵn sàng.');
+            } else if (attempts >= maxAttempts) {
+              clearInterval(pollTimer);
+              setIsConnectingGoogle(false);
+            }
+          }
+        } catch {
+          if (attempts >= maxAttempts) {
+            clearInterval(pollTimer);
+            setIsConnectingGoogle(false);
+          }
+        }
+      }, 1500);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      onToast(`⚠️ Lỗi kết nối Google: ${msg}`);
+      setIsConnectingGoogle(false);
+    }
+  };
+
+  const handleDisconnectGoogle = () => {
+    localStorage.removeItem('cardflow_google_state');
+    setGoogleState(null);
+    setIsGoogleConnected(false);
+    onToast('ℹ️ Đã ngắt kết nối tài khoản Google');
+  };
+
+  // Google Sheets Export Handler
+  const handleExportGoogleSheet = async () => {
+    if (transactions.length === 0) {
+      onToast('⚠️ Không có giao dịch nào để xuất sang Google Sheets');
+      return;
+    }
+
+    let activeState = googleState;
+    if (!activeState) {
+      const status = await getGoogleDriveStatusAction();
+      if (status.connected && status.state) {
+        activeState = status.state;
+        setGoogleState(status.state);
+        setIsGoogleConnected(true);
+      }
+    }
+
+    if (!activeState) {
+      onToast('👉 Vui lòng kết nối tài khoản Google trước khi xuất bảng tính.');
+      handleConnectGoogle();
+      return;
+    }
+
+    setIsExportingSheet(true);
+    try {
+      const res = await exportToGoogleSheetAction({
+        state: activeState,
+        title: `Sao Kê Giao Dịch Cardflow - ${new Date().toISOString().slice(0, 10)}`,
+        holderName,
+        cardName: activeCardName,
+        transactions,
+      });
+
+      if (res.success && res.spreadsheetUrl) {
+        setLastSheetUrl(res.spreadsheetUrl);
+        onToast('✨ Đã tạo Google Sheet thành công trong thư mục CardFlow!');
+        window.open(res.spreadsheetUrl, '_blank');
+      } else {
+        if (res.error && /not connected|state is invalid|state is required/i.test(res.error)) {
+          localStorage.removeItem('cardflow_google_state');
+          setGoogleState(null);
+          setIsGoogleConnected(false);
+          onToast('⚠️ Phiên Google đã hết hiệu lực. Hệ thống sẽ kết nối lại cho bạn.');
+          handleConnectGoogle();
+          return;
+        }
+        onToast(`⚠️ Lỗi tạo Google Sheet: ${res.error || 'Vui lòng kiểm tra lại'}`);
+      }
+    } catch {
+      onToast('⚠️ Lỗi kết nối khi xuất sang Google Sheets');
+    } finally {
+      setIsExportingSheet(false);
+    }
   };
 
   // Print/Save PDF Handler
@@ -120,7 +310,7 @@ export function ExportReportModal({
         <tr style="border-bottom: 1px solid #e2e8f0;">
           <td style="padding: 10px; text-align: center;">${idx + 1}</td>
           <td style="padding: 10px; font-family: monospace; font-size: 11px;">${tx.referenceId}</td>
-          <td style="padding: 10px;">${tx.dateDisplay} ${tx.time}</td>
+          <td style="padding: 10px;">${formatTransactionDate(tx.date, tx.dateDisplay)} ${tx.time}</td>
           <td style="padding: 10px;">•••• ${tx.cardLast4}</td>
           <td style="padding: 10px; font-weight: 600;">${tx.merchant}</td>
           <td style="padding: 10px;">${tx.categoryLabel}</td>
@@ -281,114 +471,91 @@ export function ExportReportModal({
           <CloseOutlined style={{ fontSize: '14px' }} />
         </button>
 
-        {/* Header Section */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '20px' }}>
-          <div
-            style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '14px',
-              background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.25) 0%, rgba(56, 189, 248, 0.25) 100%)',
-              border: '1px solid rgba(56, 189, 248, 0.4)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#38bdf8',
-              fontSize: '22px',
-              flexShrink: 0,
-            }}
-          >
-            <FileTextOutlined />
-          </div>
+        {/* Header Section: Tinh tế, thoáng đãng, không rườm rà */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '14px', marginBottom: '18px', paddingBottom: '14px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#ffffff' }}>
-              Xem & Xuất Báo Cáo Sao Kê Giao Dịch
-            </h3>
-            <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '3px' }}>
-              Chủ thẻ: <strong style={{ color: '#f8fafc' }}>{holderName}</strong> • Thẻ: <strong style={{ color: '#38bdf8' }}>{activeCardName}</strong> • {transactions.length} giao dịch được chọn
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <FileTextOutlined style={{ color: '#38bdf8', fontSize: '18px' }} />
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#ffffff' }}>
+                Xuất Báo Cáo Sao Kê Giao Dịch
+              </h3>
             </div>
-          </div>
-        </div>
-
-        {/* Executive Summary Cards */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
-            gap: '12px',
-            marginBottom: '20px',
-          }}
-        >
-          <div
-            style={{
-              background: 'rgba(30, 41, 59, 0.5)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '14px',
-              padding: '12px 16px',
-            }}
-          >
-            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Tổng giao dịch
+            <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
+              Chủ thẻ: <strong style={{ color: '#f8fafc' }}>{holderName}</strong> • {activeCardName} • {transactions.length} giao dịch
             </div>
-            <div style={{ fontSize: '20px', fontWeight: 800, color: '#38bdf8', marginTop: '4px' }}>
-              {transactions.length} <span style={{ fontSize: '12px', fontWeight: 600 }}>GD</span>
+            {/* Dòng số liệu tóm tắt mỏng, tinh gọn */}
+            <div style={{ fontSize: '12px', color: '#cbd5e1', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <span>
+                Chi tiêu: <strong style={{ color: '#f87171' }}>-{formatVND(totalExpense)}</strong>
+              </span>
+              <span>•</span>
+              <span>
+                Hoàn tiền: <strong style={{ color: '#4ade80' }}>+{formatVND(totalIncome)}</strong>
+              </span>
+              <span>•</span>
+              <span>
+                Biến động ròng:{' '}
+                <strong style={{ color: netChange >= 0 ? '#4ade80' : '#f87171' }}>
+                  {netChange >= 0 ? '+' : ''}{formatVND(netChange)}
+                </strong>
+              </span>
             </div>
           </div>
 
+          {/* Google Drive Status: Badge nhỏ thanh lịch góc phải */}
           <div
             style={{
-              background: 'rgba(30, 41, 59, 0.5)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '14px',
-              padding: '12px 16px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: isGoogleConnected ? 'rgba(16, 185, 129, 0.1)' : 'rgba(56, 189, 248, 0.1)',
+              border: isGoogleConnected ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid rgba(56, 189, 248, 0.25)',
+              borderRadius: '10px',
+              padding: '6px 12px',
+              fontSize: '12px',
             }}
           >
-            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <ArrowDownOutlined style={{ color: '#f87171' }} /> Tổng Chi Tiêu (-)
-            </div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: '#f87171', marginTop: '4px', fontFamily: 'monospace' }}>
-              -{formatVND(totalExpense)}
-            </div>
-          </div>
-
-          <div
-            style={{
-              background: 'rgba(30, 41, 59, 0.5)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '14px',
-              padding: '12px 16px',
-            }}
-          >
-            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <ArrowUpOutlined style={{ color: '#4ade80' }} /> Tiền Hoàn / Nạp (+)
-            </div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: '#4ade80', marginTop: '4px', fontFamily: 'monospace' }}>
-              +{formatVND(totalIncome)}
-            </div>
-          </div>
-
-          <div
-            style={{
-              background: 'rgba(30, 41, 59, 0.5)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '14px',
-              padding: '12px 16px',
-            }}
-          >
-            <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Biến động ròng
-            </div>
-            <div
-              style={{
-                fontSize: '18px',
-                fontWeight: 800,
-                color: netChange >= 0 ? '#4ade80' : '#f87171',
-                marginTop: '4px',
-                fontFamily: 'monospace',
-              }}
-            >
-              {netChange >= 0 ? '+' : ''}{formatVND(netChange)}
-            </div>
+            <GoogleOutlined style={{ color: isGoogleConnected ? '#34d399' : '#38bdf8' }} />
+            <span style={{ color: isGoogleConnected ? '#34d399' : '#38bdf8', fontWeight: 600 }}>
+              {isGoogleConnected ? 'Drive: CardFlow' : 'Drive: Chưa kết nối'}
+            </span>
+            {isCheckingGoogle ? (
+              <LoadingOutlined style={{ fontSize: '11px', color: '#94a3b8' }} />
+            ) : isGoogleConnected ? (
+              <button
+                type="button"
+                onClick={handleDisconnectGoogle}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                  textDecoration: 'underline',
+                  padding: 0,
+                }}
+              >
+                Đổi
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleConnectGoogle}
+                disabled={isConnectingGoogle}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#38bdf8',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  textDecoration: 'underline',
+                  padding: 0,
+                }}
+              >
+                {isConnectingGoogle ? 'Đang mở...' : 'Kết nối'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -431,7 +598,7 @@ export function ExportReportModal({
                     {tx.referenceId}
                   </td>
                   <td style={{ padding: '10px 14px', color: '#cbd5e1' }}>
-                    {tx.dateDisplay} {tx.time}
+                    {formatTransactionDate(tx.date, tx.dateDisplay)} {tx.time}
                   </td>
                   <td style={{ padding: '10px 14px', color: '#94a3b8' }}>
                     •••• {tx.cardLast4}
@@ -464,54 +631,161 @@ export function ExportReportModal({
           </table>
         </div>
 
+        {/* Cloud Links Banner if generated */}
+        {(lastSheetUrl || lastDriveUrl) && (
+          <div
+            style={{
+              marginBottom: '16px',
+              padding: '12px 16px',
+              background: 'rgba(16, 185, 129, 0.1)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '8px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#6ee7b7' }}>
+              <LinkOutlined style={{ color: '#10b981' }} />
+              <span>Đã xuất thành công:</span>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              {lastSheetUrl && (
+                <a
+                  href={lastSheetUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    color: '#34d399',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: 'rgba(52, 211, 153, 0.15)',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                  }}
+                >
+                  <TableOutlined /> Mở Google Sheets ↗
+                </a>
+              )}
+              {lastDriveUrl && (
+                <a
+                  href={lastDriveUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    color: '#38bdf8',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: 'rgba(56, 189, 248, 0.15)',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                  }}
+                >
+                  <CloudUploadOutlined /> Xem trên Google Drive ↗
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Footer Actions */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        {/* Footer Actions: Tối giản, thanh lịch, gọn gàng */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '12px',
+            paddingTop: '14px',
+            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+          }}
+        >
           <div style={{ fontSize: '12px', color: '#64748b' }}>
-            💡 File CSV hỗ trợ mở trực tiếp trên Microsoft Excel và Google Sheets.
+            Xuất file sao kê chuẩn bảng tính hoặc in ấn đối chiếu
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button
               type="button"
               onClick={handlePrint}
               style={{
-                padding: '10px 18px',
-                borderRadius: '12px',
-                background: 'rgba(30, 41, 59, 0.8)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                color: '#f8fafc',
-                fontSize: '13px',
-                fontWeight: 700,
+                padding: '8px 14px',
+                borderRadius: '10px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                color: '#cbd5e1',
+                fontSize: '12px',
+                fontWeight: 600,
                 cursor: 'pointer',
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.2s',
+                gap: '6px',
               }}
             >
-              <PrinterOutlined style={{ color: '#38bdf8' }} /> In / Lưu PDF
+              <PrinterOutlined style={{ color: '#38bdf8' }} /> In / PDF
             </button>
 
             <button
               type="button"
               onClick={handleDownloadCSV}
               style={{
-                padding: '10px 20px',
-                borderRadius: '12px',
-                background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
-                border: 'none',
-                color: '#ffffff',
-                fontSize: '13px',
-                fontWeight: 700,
+                padding: '8px 14px',
+                borderRadius: '10px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                color: '#38bdf8',
+                fontSize: '12px',
+                fontWeight: 600,
                 cursor: 'pointer',
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
-                gap: '8px',
-                boxShadow: '0 8px 20px -4px rgba(2, 132, 199, 0.4)',
-                transition: 'all 0.2s',
+                gap: '6px',
               }}
             >
-              <DownloadOutlined /> Tải File CSV (Excel)
+              <DownloadOutlined /> Tải CSV
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportGoogleSheet}
+              disabled={isExportingSheet}
+              style={{
+                padding: '8px 18px',
+                borderRadius: '10px',
+                background: isExportingSheet
+                  ? '#334155'
+                  : 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                border: 'none',
+                color: '#ffffff',
+                fontSize: '12px',
+                fontWeight: 700,
+                cursor: isExportingSheet ? 'not-allowed' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 4px 15px rgba(16, 185, 129, 0.35)',
+              }}
+            >
+              {isExportingSheet ? (
+                <>
+                  <LoadingOutlined /> Đang tạo Sheet...
+                </>
+              ) : (
+                <>
+                  <TableOutlined /> Xuất Google Sheets
+                </>
+              )}
             </button>
           </div>
         </div>

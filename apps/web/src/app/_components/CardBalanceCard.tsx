@@ -62,7 +62,7 @@ export function CardBalanceCard({
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(245, 158, 11, 0.12)', padding: '4px 10px', borderRadius: '12px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
           <TrophyOutlined style={{ color: '#f59e0b', fontSize: '12px' }} />
           <span style={{ fontSize: '11px', fontWeight: 700, color: '#fbbf24' }}>
-            {rewardPoints.toLocaleString()} PTS
+            {rewardPoints.toLocaleString('en-US')} PTS
           </span>
         </div>
       </div>

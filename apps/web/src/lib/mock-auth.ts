@@ -71,7 +71,7 @@ export function buildMockTokenSet(user: MockUser): TokenSet {
   const now = Math.floor(Date.now() / 1000);
 
   const accessPayload = {
-    iss: 'http://localhost:31000/mock-issuer',
+    iss: 'http://localhost:3000/mock-issuer',
     sub: user.sub,
     aud: 'cardflow-app-web',
     iat: now,

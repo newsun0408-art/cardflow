@@ -29,6 +29,8 @@ interface PersonalCard3DProps {
   cardType?: string;
   nfcId?: string;
   bankName?: string;
+  purposeLabel?: string;
+  purposeIcon?: string;
 }
 
 export const PERSONAL_CARD_DATA = {
@@ -57,6 +59,8 @@ export function PersonalCard3D({
   cardType = PERSONAL_CARD_DATA.cardType,
   nfcId = PERSONAL_CARD_DATA.nfcId,
   bankName = PERSONAL_CARD_DATA.issuer,
+  purposeLabel,
+  purposeIcon,
 }: PersonalCard3DProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [rotX, setRotX] = useState(0);
@@ -290,9 +294,32 @@ export function PersonalCard3D({
               <div style={{ position: 'absolute', inset: '6px', border: '1px solid rgba(0,0,0,0.2)', borderRadius: '4px' }} />
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.06)', padding: '4px 10px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
-              <SafetyCertificateFilled style={{ color: '#22c55e', fontSize: '12px' }} />
-              <span style={{ fontSize: '11px', fontWeight: 600, color: '#e2e8f0' }}>{cardType}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {purposeLabel && (
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    background: 'rgba(0, 0, 0, 0.4)',
+                    backdropFilter: 'blur(6px)',
+                    padding: '3px 8px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.22)',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    color: '#ffffff',
+                    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.25)',
+                  }}
+                >
+                  <span>{purposeIcon || '🎯'}</span>
+                  <span>{purposeLabel}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.06)', padding: '4px 10px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <SafetyCertificateFilled style={{ color: '#22c55e', fontSize: '12px' }} />
+                <span style={{ fontSize: '11px', fontWeight: 600, color: '#e2e8f0' }}>{cardType}</span>
+              </div>
             </div>
           </div>
 

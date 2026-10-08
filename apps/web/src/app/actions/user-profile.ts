@@ -20,7 +20,7 @@ export interface UpdateProfileResult {
 }
 
 const VN_PHONE_REGEX = /^(0|\+84)(3[2-9]|5[25689]|7[06-9]|8[1-9]|9[0-9])[0-9]{7}$/;
-const NICKNAME_REGEX = /^[a-zA-Z0-9_.-]{2,30}$/;
+const NICKNAME_REGEX = /^[\p{L}\p{N}_.-]{2,30}$/u;
 
 export async function updateUserProfileAction(
   currentProfile: UserProfile,
